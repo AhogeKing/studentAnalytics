@@ -1,0 +1,9 @@
+# idea
+studentAnalytics.iml
+.idea
+
+# dataset
+databases/Student_performance_data _.csv
+
+# others
+doc
