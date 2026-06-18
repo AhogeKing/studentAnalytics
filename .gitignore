@@ -12,3 +12,6 @@ target/
 
 # sql
 src/main/resources/sql/studentAnalytics_schema.sql
+
+# .vscode
+.vscode
