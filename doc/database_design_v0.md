@@ -165,6 +165,8 @@ V0 初始化时写入以下字典：
 | 3 | D | `2.0 <= GPA < 2.5` |
 | 4 | F | `GPA < 2.0` |
 
+根据 `dataset/Student_performance_data _.csv` 的实际数据分布，`GradeClass` 数值越大，整体 GPA 越低。因此 V0 保留数据集原始语义：`0` 表示最高等级 A，`4` 表示最低等级 F。若 CSV 原始 `GradeClass` 与根据 GPA 计算出的等级不一致，导入逻辑应优先使用系统计算出的 `grade_class`，同时通过 `data_quality_status` 和 `quality_issue` 标记该行存在质量问题。
+
 ---
 
 ### 5.3 学生基础信息表 `student`
@@ -223,6 +225,8 @@ V0 初始化时写入以下字典：
 | `gpa` | `DECIMAL(5,4)` | 非空 | GPA，范围 0 到 4 |
 | `grade_class` | `TINYINT` | 非空 | 成绩等级编码，0=A，1=B，2=C，3=D，4=F |
 | `data_source` | `ENUM('CSV','MANUAL')` | 非空，默认 `CSV` | 数据来源 |
+| `data_quality_status` | `TINYINT` | 非空，默认 `0` | 数据质量状态，0 正常，1 警告，2 无效 |
+| `quality_issue` | `VARCHAR(255)` | 可空 | 数据质量原因 |
 | `created_at` | `DATETIME` | 非空，默认当前时间 | 创建时间 |
 | `updated_at` | `DATETIME` | 非空，自动更新时间 | 更新时间 |
 
@@ -243,12 +247,14 @@ V0 初始化时写入以下字典：
   - `volunteering IN (0, 1)`
   - `gpa >= 0 AND gpa <= 4`
   - `grade_class IN (0, 1, 2, 3, 4)`
+  - `data_quality_status IN (0, 1, 2)`
 
 业务说明：
 
 - `UNIQUE KEY uk_performance_student_id (student_id)` 表示 V0 中每个学生只有一条表现记录。
 - 若后续要支持按学期或考试展示成绩趋势，需要移除该唯一约束，并增加 `term`、`record_date` 等字段。
 - 决策树预测 `grade_class` 时，应避免把 `gpa` 作为输入特征，因为 `grade_class` 本身由 GPA 派生，加入 GPA 会造成目标泄露。
+- 导入 CSV 时，如果原始 `GradeClass` 与根据 GPA 计算出的等级不一致，可将 `data_quality_status` 标记为 `1`，并在 `quality_issue` 中记录 `GRADE_CLASS_GPA_MISMATCH` 等原因。
 
 ---
 

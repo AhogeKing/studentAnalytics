@@ -121,6 +121,8 @@ CREATE TABLE student_performance
     gpa               DECIMAL(5, 4)          NOT NULL COMMENT 'GPA, dataset range 0-4',
     grade_class       TINYINT                NOT NULL COMMENT '0 A, 1 B, 2 C, 3 D, 4 F',
     data_source       ENUM ('CSV', 'MANUAL') NOT NULL DEFAULT 'CSV' COMMENT 'Record source',
+    data_quality_status TINYINT              NOT NULL DEFAULT 0 COMMENT '0 NORMAL, 1 WARNING, 2 INVALID',
+    quality_issue     VARCHAR(255)           NULL COMMENT '数据质量原因',
     created_at        DATETIME               NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME               NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -139,7 +141,8 @@ CREATE TABLE student_performance
     CONSTRAINT chk_perf_music CHECK (music IN (0, 1)),
     CONSTRAINT chk_perf_volunteering CHECK (volunteering IN (0, 1)),
     CONSTRAINT chk_perf_gpa CHECK (gpa >= 0 AND gpa <= 4),
-    CONSTRAINT chk_perf_grade_class CHECK (grade_class IN (0, 1, 2, 3, 4))
+    CONSTRAINT chk_perf_grade_class CHECK (grade_class IN (0, 1, 2, 3, 4)),
+    CONSTRAINT chk_perf_data_quality_status CHECK (data_quality_status IN (0, 1, 2))
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Student learning behavior and performance table';
