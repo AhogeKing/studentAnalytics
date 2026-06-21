@@ -1,7 +1,9 @@
 import csv
+import json
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Final
 
@@ -241,6 +243,36 @@ def load_student_data_from_csv(csv_path: str | Path, encoding: str = "utf-8"):
         return ImportResult(valid_rows, invalid_rows)
 
 
+def format_invalid_row_errors(errors: object) -> str:
+    """把非法行错误列表格式化成报告中的文本。"""
+    if isinstance(errors, list):
+        return "; ".join(str(error) for error in errors)
+    return str(errors)
+
+
+def write_invalid_rows_report(
+    invalid_rows: list[dict[str, object]], report_path: Path
+) -> Path | None:
+    """把非法 CSV 行写入报告文件，没有非法行时不生成文件。"""
+    if not invalid_rows:
+        return None
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with report_path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=["row_number", "data", "errors"])
+        writer.writeheader()
+
+        for row in invalid_rows:
+            writer.writerow({
+                "row_number": row.get("row_number", ""),
+                "data": json.dumps(row.get("data", {}), ensure_ascii=False),
+                "errors": format_invalid_row_errors(row.get("errors", [])),
+            })
+
+    return report_path
+
+
 def split_row(row: dict[str, int | float], generator: StudentNameGenerator):
     """把一行合法 CSV 数据拆成学生信息和成绩表现数据。"""
     student = StudentData(
@@ -280,16 +312,58 @@ def split_rows(import_result: ImportResult):
     return split_result
 
 
+def insert_students(conn, student_rows):
+    # TODO: 批量插入 student 表，并处理 student_no 唯一键冲突策略。
+    pass
+
+
+def fetch_student_id_map(conn, student_rows):
+    # TODO: 根据 student_no 批量查询数据库主键 id，返回 student_no -> id 映射。
+    pass
+
+
+def insert_performances(conn, performance_rows, student_id_map):
+    # TODO: 使用 student_id 映射批量插入 student_performance 表。
+    pass
+
+
+def import_to_database(split_result):
+    # TODO: 用事务串联 student 插入、id 映射查询和 performance 插入。
+    pass
+
+
+def test_db_connection():
+    """测试数据库连接是否可用。"""
+    conn = create_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT DATABASE() AS database_name")
+            print(cursor.fetchone())
+    finally:
+        conn.close()
+
 def main() -> int:
     """运行 CSV 读取、校验和拆分流程。"""
+    status = 0
+    project_root = Path(__file__).resolve().parents[2]
     import_result = load_student_data_from_csv(
-        Path(__file__).resolve().parents[2]
-        / "dataset"
-        / "Student_performance_data_.csv"
+        project_root / "dataset" / "Student_performance_data_.csv"
     )
+    report_path = write_invalid_rows_report(
+        import_result.invalid_rows,
+        project_root
+        / "reports"
+        / f"student_import_invalid_rows_{datetime.now():%Y%m%d_%H%M%S}.csv",
+    )
+    if report_path is not None:
+        print(f"invalid_rows_report = {report_path}")
+        status = 1
+
     split_result = split_rows(import_result)
     print(f"split_count = {len(split_result)}")
-    return 0
+
+    test_db_connection()
+    return status
 
 
 if __name__ == "__main__":
