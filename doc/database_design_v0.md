@@ -192,7 +192,7 @@ V0 初始化时写入以下字典：
 - 唯一索引：`uk_student_no (student_no)`
 - 查询索引：`idx_student_age`、`idx_student_gender`、`idx_student_ethnicity`、`idx_student_parental_education`
 - 检查约束：
-  - `age BETWEEN 0 AND 120`
+  - `age BETWEEN 0 AND 30`
   - `gender IN (0, 1)`
   - `ethnicity IN (0, 1, 2, 3)`
   - `parental_education IN (0, 1, 2, 3, 4)`
@@ -561,7 +561,7 @@ V0 中部分字段通过 MySQL `CHECK` 约束限制取值范围：
 
 | 表名 | 字段 | 规则 |
 |---|---|---|
-| `student` | `age` | `0 <= age <= 120` |
+| `student` | `age` | `0 <= age <= 30` |
 | `student` | `gender` | `gender IN (0, 1)` |
 | `student` | `ethnicity` | `ethnicity IN (0, 1, 2, 3)` |
 | `student` | `parental_education` | `parental_education IN (0, 1, 2, 3, 4)` |

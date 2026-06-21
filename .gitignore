@@ -1,9 +1,10 @@
 # idea
 studentAnalytics.iml
+student-analytics.iml
 .idea
 
 # dataset
-dataset/Student_performance_data _.csv
+dataset/Student_performance_data_.csv
 
 # others
 doc
@@ -12,6 +13,11 @@ target/
 
 # sql
 src/main/resources/sql/studentAnalytics_schema.sql
+src/main/resources/sql/apply_v0_age_constraint_patch.sql
+src/main/resources/sql/apply_v0_quality_patch.sql
+
+#scripts
+scripts/import_student_data_ori.py
 
 # .vscode
 .vscode

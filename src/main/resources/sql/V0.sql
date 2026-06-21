@@ -96,7 +96,7 @@ CREATE TABLE student
     KEY idx_student_gender (gender),
     KEY idx_student_ethnicity (ethnicity),
     KEY idx_student_parental_education (parental_education),
-    CONSTRAINT chk_student_age CHECK (age BETWEEN 0 AND 120),
+    CONSTRAINT chk_student_age CHECK (age BETWEEN 0 AND 30),
     CONSTRAINT chk_student_gender CHECK (gender IN (0, 1)),
     CONSTRAINT chk_student_ethnicity CHECK (ethnicity IN (0, 1, 2, 3)),
     CONSTRAINT chk_student_parental_education CHECK (parental_education IN (0, 1, 2, 3, 4)),
