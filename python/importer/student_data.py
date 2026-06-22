@@ -251,7 +251,7 @@ def format_invalid_row_errors(errors: object) -> str:
 
 
 def write_invalid_rows_report(
-    invalid_rows: list[dict[str, object]], report_path: Path
+        invalid_rows: list[dict[str, object]], report_path: Path
 ) -> Path | None:
     """把非法 CSV 行写入报告文件，没有非法行时不生成文件。"""
     if not invalid_rows:
@@ -273,6 +273,28 @@ def write_invalid_rows_report(
     return report_path
 
 
+def calculate_grade_class(gpa: float) -> int:
+    if gpa >= 3.5:
+        return 0
+    if gpa >= 3.0:
+        return 1
+    if gpa >= 2.5:
+        return 2
+    if gpa >= 2.0:
+        return 3
+    return 4
+
+
+def assess_performance_quality(row: dict[str, int | float]) -> tuple[int, str | None]:
+    expected_grade_class = calculate_grade_class(row["GPA"])
+    actual_grade_class = row["GradeClass"]
+
+    if expected_grade_class != actual_grade_class:
+        return (1,
+                f"GPA={row['GPA']} 对应 GradeClass={expected_grade_class}, CSV 中为 {actual_grade_class}")
+    return 0, None
+
+
 def split_row(row: dict[str, int | float], generator: StudentNameGenerator):
     """把一行合法 CSV 数据拆成学生信息和成绩表现数据。"""
     student = StudentData(
@@ -283,6 +305,8 @@ def split_row(row: dict[str, int | float], generator: StudentNameGenerator):
         ethnicity=row["Ethnicity"],
         parental_education=row["ParentalEducation"],
     )
+
+    quality_status, quality_issue = assess_performance_quality(row)
 
     performance = PerformanceData(
         student_no=row["StudentID"],
@@ -296,6 +320,8 @@ def split_row(row: dict[str, int | float], generator: StudentNameGenerator):
         volunteering=row["Volunteering"],
         gpa=row["GPA"],
         grade_class=row["GradeClass"],
+        data_quality_status=quality_status,
+        quality_issue=quality_issue
     )
 
     return SplitRow(student, performance)
@@ -312,35 +338,156 @@ def split_rows(import_result: ImportResult):
     return split_result
 
 
-def insert_students(conn, student_rows):
-    # TODO: 批量插入 student 表，并处理 student_no 唯一键冲突策略。
-    pass
+def insert_students(conn, student_rows: list[StudentData]) -> int:
+    """批量插入 student 表；如果 student_no 已存在，则更新基础信息。"""
+    if not student_rows:
+        return 0
+
+    sql = """
+          INSERT INTO student (student_no,
+                               age,
+                               gender,
+                               ethnicity,
+                               parental_education,
+                               name)
+          VALUES (%s, %s, %s, %s, %s, %s)
+          ON DUPLICATE KEY UPDATE age                = VALUES(age),
+                                  gender             = VALUES(gender),
+                                  ethnicity          = VALUES(ethnicity),
+                                  parental_education = VALUES(parental_education),
+                                  name               = VALUES(name) \
+          """
+
+    params = [
+        (
+            student.student_no,
+            student.age,
+            student.gender,
+            student.ethnicity,
+            student.parental_education,
+            student.name,
+        )
+        for student in student_rows
+    ]
+
+    with conn.cursor() as cursor:
+        affected_rows = cursor.executemany(sql, params)
+
+    return affected_rows
 
 
-def fetch_student_id_map(conn, student_rows):
+def fetch_student_id_map(conn, student_rows: list[StudentData]):
     # TODO: 根据 student_no 批量查询数据库主键 id，返回 student_no -> id 映射。
-    pass
+    student_nos = [s.student_no for s in student_rows]
+    placeholders = ", ".join(["%s"] * len(student_nos))
+    sql = f"SELECT id, student_no FROM student WHERE student_no IN ({placeholders})"
+
+    with conn.cursor() as cursor:
+        cursor.execute(sql, student_nos)
+        rows = cursor.fetchall()
+
+    student_id_map = {
+        int(row["student_no"]): int(row["id"])
+        for row in rows
+    }
+
+    missing_student_nos = set(student_nos) - set(student_id_map.keys())
+    if missing_student_nos:
+        raise RuntimeError(f"部分 student_no 没有查到数据库 id: {sorted(missing_student_nos)}")
+
+    return student_id_map
 
 
-def insert_performances(conn, performance_rows, student_id_map):
-    # TODO: 使用 student_id 映射批量插入 student_performance 表。
-    pass
+def insert_performances(
+        conn,
+        performance_rows: list[PerformanceData],
+        student_id_map: dict[int, int]
+) -> int:
+    """批量插入 student_performance 表；如果学生表现记录已存在，则更新表现数据。"""
+    if not performance_rows:
+        return 0
+
+    sql = """
+          INSERT INTO student_performance (student_id,
+                                           study_time_weekly,
+                                           absences,
+                                           tutoring,
+                                           parental_support,
+                                           extracurricular,
+                                           sports,
+                                           music,
+                                           volunteering,
+                                           gpa,
+                                           grade_class,
+                                           data_source,
+                                           data_quality_status,
+                                           quality_issue)
+          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+          ON DUPLICATE KEY UPDATE study_time_weekly   = VALUES(study_time_weekly),
+                                  absences            = VALUES(absences),
+                                  tutoring            = VALUES(tutoring),
+                                  parental_support    = VALUES(parental_support),
+                                  extracurricular     = VALUES(extracurricular),
+                                  sports              = VALUES(sports),
+                                  music               = VALUES(music),
+                                  volunteering        = VALUES(volunteering),
+                                  gpa                 = VALUES(gpa),
+                                  grade_class         = VALUES(grade_class),
+                                  data_source         = VALUES(data_source),
+                                  data_quality_status = VALUES(data_quality_status),
+                                  quality_issue       = VALUES(quality_issue)
+          """
+
+    params = []
+    for performance in performance_rows:
+        student_id = student_id_map.get(performance.student_no)
+        if student_id is None:
+            raise RuntimeError(f"student_no={performance.student_no} 没有对应的 student.id")
+
+        params.append((
+            student_id,
+            performance.study_time_weekly,
+            performance.absences,
+            performance.tutoring,
+            performance.parental_support,
+            performance.extracurricular,
+            performance.sports,
+            performance.music,
+            performance.volunteering,
+            performance.gpa,
+            performance.grade_class,
+            performance.data_source,
+            performance.data_quality_status,
+            performance.quality_issue,
+        ))
+
+    with conn.cursor() as cursor:
+        affected_rows = cursor.executemany(sql, params)
+
+    return affected_rows
 
 
-def import_to_database(split_result):
-    # TODO: 用事务串联 student 插入、id 映射查询和 performance 插入。
-    pass
-
-
-def test_db_connection():
-    """测试数据库连接是否可用。"""
+def import_to_database(split_result: list[SplitRow]):
+    """用一个事务完成 student 与 student_performance 的导入。"""
     conn = create_db_connection()
+    student_rows = [row.student for row in split_result]
+    performance_rows = [row.performance for row in split_result]
+
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT DATABASE() AS database_name")
-            print(cursor.fetchone())
+        student_affected_rows = insert_students(conn, student_rows)
+        student_id_map = fetch_student_id_map(conn, student_rows)
+        performance_affected_rows = insert_performances(conn, performance_rows, student_id_map)
+
+        conn.commit()
+        print(f"insert_students affected_rows = {student_affected_rows}")
+        print(f"insert_performances affected_rows = {performance_affected_rows}")
+
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+
 
 def main() -> int:
     """运行 CSV 读取、校验和拆分流程。"""
@@ -362,17 +509,9 @@ def main() -> int:
     split_result = split_rows(import_result)
     print(f"split_count = {len(split_result)}")
 
-    test_db_connection()
+    import_to_database(split_result)
     return status
 
 
 if __name__ == "__main__":
     sys.exit(main())
-
-# with conn:
-#     with conn.cursor() as cursor:
-#         # read a single record
-#         sql = "SELECT * FROM `dict_item`"
-#         cursor.execute(sql)
-#         result = cursor.fetchall()
-#         print(result)
