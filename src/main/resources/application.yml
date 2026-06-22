@@ -1,16 +1,23 @@
 server:
-  port: 8080
+  port: 8081
+  servlet:
+    context-path: /StudentAnalytics
 
 spring:
+  config:
+    import:
+      - optional:classpath:jwt.yml
+      - optional:file:./python/importer/.env[.properties]
   application:
     name: student-analytics
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/student_analytics?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:localhost}:3306/${MYSQL_DATABASE:student_analytics}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:}
+    password: ${MYSQL_PASSWORD}
     hikari:
       initialization-fail-timeout: -1
+      connection-init-sql: USE student_analytics
 
 mybatis:
   configuration:

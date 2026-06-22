@@ -6,8 +6,11 @@ student-analytics.iml
 # dataset
 dataset/Student_performance_data_.csv
 
-# others
-doc
+# docs
+doc/*
+!doc/
+!doc/TODO.md
+!doc/utility-classes-usage.md
 .DS_Store
 target/
 
@@ -15,6 +18,10 @@ target/
 src/main/resources/sql/studentAnalytics_schema.sql
 src/main/resources/sql/apply_v0_age_constraint_patch.sql
 src/main/resources/sql/apply_v0_quality_patch.sql
+
+# local secrets
+src/main/resources/jwt.yml
+python/importer/.env
 
 #scripts
 scripts/import_student_data_ori.py
