@@ -19,6 +19,7 @@ spring:
       initialization-fail-timeout: -1
       connection-init-sql: USE student_analytics
 
-mybatis:
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
