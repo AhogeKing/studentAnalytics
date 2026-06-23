@@ -24,7 +24,7 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "app.jwt")
 public class JwtUtil {
     private String secret;
-    private long expirationHours = 24;
+    private long expirationHours = 6;
 
     private SecretKey secretKey;
 
@@ -39,10 +39,11 @@ public class JwtUtil {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createLoginToken(Integer userId, String username, String role) {
+    public String createLoginToken(Integer userId, String username, String realName, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
+        claims.put("realName", realName);
         claims.put("role", role);
         return createToken(String.valueOf(userId), claims);
     }
@@ -82,6 +83,10 @@ public class JwtUtil {
 
     public String getUsername(String token) {
         return parseToken(token).get("username", String.class);
+    }
+
+    public String getRealName(String token) {
+        return parseToken(token).get("realName", String.class);
     }
 
     public String getRole(String token) {

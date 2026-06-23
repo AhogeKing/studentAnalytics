@@ -31,6 +31,13 @@ public final class SysUserContext {
                 : claims.get("username", String.class);
     }
 
+    public static String getRealName() {
+        Claims claims = get();
+        return claims == null
+                ? null
+                : claims.get("realName", String.class);
+    }
+
     public static String getRole() {
         Claims claims = get();
         return claims == null

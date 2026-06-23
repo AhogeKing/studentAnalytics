@@ -55,7 +55,12 @@ public class SysUserServiceImpl implements SysUserService {
         if (!PasswordUtil.matches(loginRequest.getPassword(), dbUser.getPassword())) {
             throw new BusinessException("用户名或密码错误");
         }
-        String token = jwtUtil.createLoginToken(dbUser.getId(), dbUser.getUsername(), dbUser.getRole());
+        String token = jwtUtil.createLoginToken(
+                dbUser.getId(),
+                dbUser.getUsername(),
+                dbUser.getRealName(),
+                dbUser.getRole()
+        );
 
         // 组装返回结果
         LoginResponse response = new LoginResponse();
