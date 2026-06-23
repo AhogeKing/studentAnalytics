@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import random
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,6 +31,8 @@ EXPECTED_COLUMNS: Final[list[str]] = [
 ]
 
 FLOAT_COLUMNS: Final[list[str]] = ["StudyTimeWeekly", "GPA"]
+CLASS_COUNT_BY_GRADE: Final[dict[int, int]] = {1: 17, 2: 12, 3: 17}
+CLASS_ASSIGNMENT_RANDOM_SEED: Final[int] = 20260623
 
 RANGE_RULES: Final[dict[str, tuple[float, float]]] = {
     "StudentID": (1, 2_147_483_647),
@@ -94,6 +97,8 @@ class ImportResult:
 class StudentData:
     student_no: int
     age: int
+    grade_level: int
+    class_name: str
     gender: int
     ethnicity: int
     parental_education: int
@@ -122,6 +127,57 @@ class PerformanceData:
 class SplitRow:
     student: StudentData
     performance: PerformanceData
+
+
+class GradeClassAllocator:
+    """按年龄均衡分配年级，并在每个年级内均衡随机分班。"""
+
+    def __init__(self, seed: int = CLASS_ASSIGNMENT_RANDOM_SEED):
+        self._random = random.Random(seed)
+        self._age_grade_counts: dict[tuple[int, int], int] = {}
+        self._class_counts: dict[int, dict[int, int]] = {
+            grade_level: {class_no: 0 for class_no in range(1, class_count + 1)}
+            for grade_level, class_count in CLASS_COUNT_BY_GRADE.items()
+        }
+
+    def assign(self, age: int) -> tuple[int, str]:
+        grade_level = self._assign_grade_level(age)
+        class_no = self._assign_class_no(grade_level)
+        return grade_level, f"{grade_level}-{class_no}"
+
+    def _assign_grade_level(self, age: int) -> int:
+        if age <= 15:
+            return 1
+        if age == 16:
+            return self._assign_balanced_age_grade(age, [1, 2])
+        if age == 17:
+            return self._assign_balanced_age_grade(age, [2, 3])
+        return 3
+
+    def _assign_balanced_age_grade(self, age: int, candidates: list[int]) -> int:
+        min_count = min(self._age_grade_counts.get((age, grade), 0) for grade in candidates)
+        least_used = [
+            grade
+            for grade in candidates
+            if self._age_grade_counts.get((age, grade), 0) == min_count
+        ]
+        grade_level = self._random.choice(least_used)
+        self._age_grade_counts[(age, grade_level)] = (
+            self._age_grade_counts.get((age, grade_level), 0) + 1
+        )
+        return grade_level
+
+    def _assign_class_no(self, grade_level: int) -> int:
+        class_counts = self._class_counts[grade_level]
+        min_count = min(class_counts.values())
+        least_used = [
+            class_no
+            for class_no, count in class_counts.items()
+            if count == min_count
+        ]
+        class_no = self._random.choice(least_used)
+        class_counts[class_no] += 1
+        return class_no
 
 
 def validate_header(header: list[str] | None):
@@ -291,22 +347,31 @@ def assess_performance_quality(row: dict[str, int | float]) -> tuple[int, str | 
 
     if expected_grade_class != actual_grade_class:
         return (1,
-                f"GPA={row['GPA']} 对应 GradeClass={expected_grade_class}, CSV 中为 {actual_grade_class}")
+                f"GPA={row['GPA']} 对应 GradeClass={expected_grade_class}, CSV 中为 {actual_grade_class}，已按 GPA 重算入库")
     return 0, None
 
 
-def split_row(row: dict[str, int | float], generator: StudentNameGenerator):
+def split_row(
+        row: dict[str, int | float],
+        generator: StudentNameGenerator,
+        allocator: GradeClassAllocator
+):
     """把一行合法 CSV 数据拆成学生信息和成绩表现数据。"""
+    grade_level, class_name = allocator.assign(row["Age"])
+
     student = StudentData(
         student_no=row["StudentID"],
         name=generator.generate(),
         age=row["Age"],
+        grade_level=grade_level,
+        class_name=class_name,
         gender=row["Gender"],
         ethnicity=row["Ethnicity"],
         parental_education=row["ParentalEducation"],
     )
 
     quality_status, quality_issue = assess_performance_quality(row)
+    grade_class = calculate_grade_class(row["GPA"])
 
     performance = PerformanceData(
         student_no=row["StudentID"],
@@ -319,7 +384,7 @@ def split_row(row: dict[str, int | float], generator: StudentNameGenerator):
         music=row["Music"],
         volunteering=row["Volunteering"],
         gpa=row["GPA"],
-        grade_class=row["GradeClass"],
+        grade_class=grade_class,
         data_quality_status=quality_status,
         quality_issue=quality_issue
     )
@@ -331,11 +396,26 @@ def split_rows(import_result: ImportResult):
     """把所有合法 CSV 行拆成后续可入库的数据对象。"""
     split_result: list[SplitRow] = []
     name_generator = StudentNameGenerator()
+    allocator = GradeClassAllocator()
 
     valid_rows = import_result.valid_rows
     for valid_row in valid_rows:
-        split_result.append(split_row(valid_row, name_generator))
+        split_result.append(split_row(valid_row, name_generator, allocator))
     return split_result
+
+
+def clear_student_tables(conn):
+    """导入前清空学生与表现表，并重置自增主键。"""
+    statements = [
+        "DELETE FROM student_performance",
+        "DELETE FROM student",
+        "ALTER TABLE student_performance AUTO_INCREMENT = 1",
+        "ALTER TABLE student AUTO_INCREMENT = 1",
+    ]
+
+    with conn.cursor() as cursor:
+        for statement in statements:
+            cursor.execute(statement)
 
 
 def insert_students(conn, student_rows: list[StudentData]) -> int:
@@ -346,12 +426,16 @@ def insert_students(conn, student_rows: list[StudentData]) -> int:
     sql = """
           INSERT INTO student (student_no,
                                age,
+                               grade_level,
+                               class_name,
                                gender,
                                ethnicity,
                                parental_education,
                                name)
-          VALUES (%s, %s, %s, %s, %s, %s)
+          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
           ON DUPLICATE KEY UPDATE age                = VALUES(age),
+                                  grade_level        = VALUES(grade_level),
+                                  class_name         = VALUES(class_name),
                                   gender             = VALUES(gender),
                                   ethnicity          = VALUES(ethnicity),
                                   parental_education = VALUES(parental_education),
@@ -362,6 +446,8 @@ def insert_students(conn, student_rows: list[StudentData]) -> int:
         (
             student.student_no,
             student.age,
+            student.grade_level,
+            student.class_name,
             student.gender,
             student.ethnicity,
             student.parental_education,
@@ -474,6 +560,7 @@ def import_to_database(split_result: list[SplitRow]):
     performance_rows = [row.performance for row in split_result]
 
     try:
+        clear_student_tables(conn)
         student_affected_rows = insert_students(conn, student_rows)
         student_id_map = fetch_student_id_map(conn, student_rows)
         performance_affected_rows = insert_performances(conn, performance_rows, student_id_map)
