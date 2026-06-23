@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
+
 public class SysUserController {
     private final SysUserService sysUserService;
 
