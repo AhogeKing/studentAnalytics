@@ -19,7 +19,7 @@
         <result column="deleted" property="deleted"/>
     </resultMap>
 
-    <resultMap id="StudentPageRowResultMap" type="com.ahogeking.studentanalytics.dto.StudentPageRow">
+    <resultMap id="StudentOverviewRowResultMap" type="com.ahogeking.studentanalytics.dto.row.StudentOverviewRow">
         <result column="student_no" property="studentNo"/>
         <result column="name" property="name"/>
         <result column="age" property="age"/>
@@ -29,6 +29,26 @@
         <result column="gpa" property="gpa"/>
         <result column="grade_class" property="gradeClass"/>
         <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="StudentDetailRowResultMap" type="com.ahogeking.studentanalytics.dto.row.StudentDetailRow">
+        <result column="study_time_weekly" property="studyTimeWeekly"/>
+        <result column="absences" property="absences"/>
+        <result column="tutoring" property="tutoring"/>
+        <result column="parental_support" property="parentalSupport"/>
+        <result column="extracurricular" property="extracurricular"/>
+        <result column="sports" property="sports"/>
+        <result column="music" property="music"/>
+        <result column="volunteering" property="volunteering"/>
+        <result column="gpa" property="gpa"/>
+        <result column="grade_class" property="gradeClass"/>
+    </resultMap>
+
+    <resultMap id="StudentDetailAggregateRowResultMap"
+               type="com.ahogeking.studentanalytics.dto.row.StudentDetailAggregateRow">
+        <result column="performance_available" property="performanceAvailable"/>
+        <association property="overview" resultMap="StudentOverviewRowResultMap" columnPrefix="overview_"/>
+        <association property="detail" resultMap="StudentDetailRowResultMap" columnPrefix="detail_"/>
     </resultMap>
 
     <sql id="BaseColumnList">
@@ -46,7 +66,11 @@
         deleted
     </sql>
 
-    <select id="selectStudentPageRows" resultMap="StudentPageRowResultMap">
+    <sql id="StudentOverviewOrderBy">
+        ORDER BY ${sortColumn} ${sortOrder}, s.student_no ASC
+    </sql>
+
+    <select id="selectStudentOverviewRows" resultMap="StudentOverviewRowResultMap">
         SELECT
         s.student_no,
         s.name,
@@ -60,7 +84,158 @@
         FROM student s
         LEFT JOIN student_performance p ON p.student_id = s.id
         WHERE s.deleted = 0
-        ORDER BY s.student_no ASC
+        <include refid="StudentOverviewOrderBy"/>
+    </select>
+
+    <select id="selectStudentOverviewRowsByClass" resultMap="StudentOverviewRowResultMap">
+        SELECT
+        s.student_no,
+        s.name,
+        s.age,
+        s.gender,
+        s.grade_level,
+        s.class_name,
+        p.gpa,
+        p.grade_class,
+        GREATEST(s.updated_at, COALESCE(p.updated_at, s.updated_at)) AS update_time
+        FROM student s
+        LEFT JOIN student_performance p ON p.student_id = s.id
+        WHERE s.deleted = 0
+        AND s.class_name = #{className}
+        <include refid="StudentOverviewOrderBy"/>
+    </select>
+
+    <select id="searchStudentOverviewRows" resultMap="StudentOverviewRowResultMap">
+        SELECT
+        s.student_no,
+        s.name,
+        s.age,
+        s.gender,
+        s.grade_level,
+        s.class_name,
+        p.gpa,
+        p.grade_class,
+        GREATEST(s.updated_at, COALESCE(p.updated_at, s.updated_at)) AS update_time
+        FROM student s
+        LEFT JOIN student_performance p ON p.student_id = s.id
+        WHERE s.deleted = 0
+        AND (
+        s.name LIKE CONCAT('%', #{keyword}, '%')
+        <if test="studentNo != null">
+            OR s.student_no = #{studentNo}
+        </if>
+        )
+        <include refid="StudentOverviewOrderBy"/>
+    </select>
+
+    <select id="filterStudentOverviewRows" resultMap="StudentOverviewRowResultMap">
+        SELECT
+        s.student_no,
+        s.name,
+        s.age,
+        s.gender,
+        s.grade_level,
+        s.class_name,
+        p.gpa,
+        p.grade_class,
+        GREATEST(s.updated_at, COALESCE(p.updated_at, s.updated_at)) AS update_time
+        FROM student s
+        LEFT JOIN student_performance p ON p.student_id = s.id
+        WHERE s.deleted = 0
+        <if test="gradeLevel != null">
+            AND s.grade_level = #{gradeLevel}
+        </if>
+        <if test="gender != null">
+            AND s.gender = #{gender}
+        </if>
+        <if test="classNames != null and classNames.size() > 0">
+            AND s.class_name IN
+            <foreach collection="classNames" item="className" open="(" separator="," close=")">
+                #{className}
+            </foreach>
+        </if>
+        <if test="minGpa != null or maxGpa != null or gradeClass != null">
+            AND (
+            <trim prefixOverrides="OR">
+                <if test="minGpa != null or maxGpa != null">
+                    OR (
+                    <if test="minGpa != null">
+                        p.gpa &gt;= #{minGpa}
+                    </if>
+                    <if test="maxGpa != null">
+                        <if test="minGpa != null">
+                            AND
+                        </if>
+                        p.gpa &lt;= #{maxGpa}
+                    </if>
+                    )
+                </if>
+                <if test="gradeClass != null">
+                    OR p.grade_class = #{gradeClass}
+                </if>
+            </trim>
+            )
+        </if>
+        <include refid="StudentOverviewOrderBy"/>
+    </select>
+
+    <select id="countStudentsByClass" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM student s
+        WHERE s.deleted = 0
+        AND s.class_name = #{className}
+    </select>
+
+    <select id="selectClassOptions" resultType="com.ahogeking.studentanalytics.vo.ClassInfoVO">
+        SELECT DISTINCT
+        s.grade_level AS gradeLevel,
+        s.class_name AS className
+        FROM student s
+        WHERE s.deleted = 0
+        ORDER BY s.grade_level ASC, CAST(SUBSTRING_INDEX(s.class_name, '-', -1) AS UNSIGNED) ASC
+    </select>
+
+    <select id="selectMinGpa" resultType="java.math.BigDecimal">
+        SELECT MIN(p.gpa)
+        FROM student_performance p
+        INNER JOIN student s ON s.id = p.student_id
+        WHERE s.deleted = 0
+    </select>
+
+    <select id="selectMaxGpa" resultType="java.math.BigDecimal">
+        SELECT MAX(p.gpa)
+        FROM student_performance p
+        INNER JOIN student s ON s.id = p.student_id
+        WHERE s.deleted = 0
+    </select>
+
+    <select id="selectStudentDetailAggregateRow" resultMap="StudentDetailAggregateRowResultMap">
+        SELECT
+        s.student_no AS overview_student_no,
+        s.name AS overview_name,
+        s.age AS overview_age,
+        s.gender AS overview_gender,
+        s.grade_level AS overview_grade_level,
+        s.class_name AS overview_class_name,
+        p.gpa AS overview_gpa,
+        p.grade_class AS overview_grade_class,
+        GREATEST(s.updated_at, COALESCE(p.updated_at, s.updated_at)) AS overview_update_time,
+        p.study_time_weekly AS detail_study_time_weekly,
+        p.absences AS detail_absences,
+        p.tutoring AS detail_tutoring,
+        p.parental_support AS detail_parental_support,
+        p.extracurricular AS detail_extracurricular,
+        p.sports AS detail_sports,
+        p.music AS detail_music,
+        p.volunteering AS detail_volunteering,
+        p.gpa AS detail_gpa,
+        p.grade_class AS detail_grade_class,
+        CASE WHEN p.id IS NULL THEN 0 ELSE 1 END AS performance_available
+        FROM student s
+        LEFT JOIN student_performance p ON p.student_id = s.id
+        WHERE s.deleted = 0
+        AND s.student_no = #{studentNo}
+        LIMIT 1
     </select>
 
 </mapper>
