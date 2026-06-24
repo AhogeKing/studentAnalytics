@@ -13,8 +13,12 @@ public class ClassInfoVO {
     @JsonProperty("class_name")
     private String className;
 
+    @JsonProperty("raw_class_name")
+    private String rawClassName;
+
     public ClassInfoVO(Integer gradeLevel, String className) {
         this.gradeLevel = gradeLevel;
+        this.rawClassName = className;
         this.className = formatClassName(className);
     }
 
@@ -23,6 +27,7 @@ public class ClassInfoVO {
     }
 
     public void setClassName(String className) {
+        this.rawClassName = className;
         this.className = formatClassName(className);
     }
 

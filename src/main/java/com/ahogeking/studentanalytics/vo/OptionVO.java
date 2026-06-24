@@ -7,15 +7,15 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class OptionVO {
-    private Integer code;
+public class OptionVO<T> {
+    private T value;
     private String label;
 
-    public static OptionVO of(Integer code, String label) {
-        return new OptionVO(code, label);
+    public static <T> OptionVO<T> of(T value, String label) {
+        return new OptionVO<>(value, label);
     }
 
-    public static OptionVO unknown() {
-        return new OptionVO(null, "未知");
+    public static <T> OptionVO<T> unknown() {
+        return new OptionVO<>(null, "未知");
     }
 }

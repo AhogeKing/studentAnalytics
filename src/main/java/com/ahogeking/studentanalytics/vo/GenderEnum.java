@@ -13,7 +13,7 @@ public enum GenderEnum {
     private final Integer code;
     private final String label;
 
-    public static OptionVO toOption(Integer code) {
+    public static OptionVO<Integer> toOption(Integer code) {
         for (GenderEnum genderEnum : values()) {
             if (genderEnum.getCode().equals(code)) {
                 return OptionVO.of(genderEnum.getCode(), genderEnum.getLabel());
