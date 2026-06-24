@@ -3,6 +3,12 @@ studentAnalytics.iml
 student-analytics.iml
 .idea
 
+# others
+.codex
+reports
+scripts
+.claude
+
 # dataset
 dataset/Student_performance_data_.csv
 
@@ -25,6 +31,9 @@ python/importer/.env
 
 #scripts
 scripts/import_student_data_ori.py
+
+# frontend
+frontend
 
 # .vscode
 .vscode
