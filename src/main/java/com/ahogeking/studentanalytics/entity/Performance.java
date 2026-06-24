@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,7 +17,7 @@ public class Performance {
     private Integer studentId;
 
     @JsonProperty("study_time_weekly")
-    private Float studyTimeWeekly;
+    private BigDecimal studyTimeWeekly;
 
     private Integer absences;
 
@@ -33,7 +34,7 @@ public class Performance {
 
     private Integer volunteering;
 
-    private Float gpa;
+    private BigDecimal gpa;
 
     @JsonProperty("grade_class")
     private Integer gradeClass;
