@@ -1,6 +1,8 @@
 package com.ahogeking.studentanalytics.service;
 
 import com.ahogeking.studentanalytics.dto.StudentOverviewQueryRequest;
+import com.ahogeking.studentanalytics.dto.StudentOverviewUpdateRequest;
+import com.ahogeking.studentanalytics.vo.StudentDetailVO;
 import com.ahogeking.studentanalytics.vo.StudentFilterOptionsVO;
 import com.ahogeking.studentanalytics.vo.StudentOverviewItemVO;
 import com.ahogeking.studentanalytics.vo.StudentOverviewVO;
@@ -13,4 +15,10 @@ public interface StudentService {
     StudentOverviewVO selectStudentOverview(StudentOverviewQueryRequest query);
 
     StudentFilterOptionsVO selectStudentFilterOptions();
+
+    StudentOverviewItemVO updateStudentOverview(Integer studentNo, StudentOverviewUpdateRequest request);
+
+    void deleteStudentOverview(Integer studentNo);
+
+    StudentDetailVO selectStudentDetail(Integer studentNo);
 }

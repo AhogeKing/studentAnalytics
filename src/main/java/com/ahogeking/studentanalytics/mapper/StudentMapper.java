@@ -43,4 +43,19 @@ public interface StudentMapper extends BaseMapper<Student> {
     BigDecimal selectMaxGpa();
 
     StudentDetailAggregateRow selectStudentDetailAggregateRow(@Param("studentNo") Integer studentNo);
+
+    StudentOverviewRow selectStudentOverviewRowByStudentNo(@Param("studentNo") Integer studentNo);
+
+    Integer updateStudentOverviewByStudentNo(@Param("studentNo") Integer studentNo,
+                                             @Param("name") String name,
+                                             @Param("age") Integer age,
+                                             @Param("gradeLevel") Integer gradeLevel,
+                                             @Param("className") String className,
+                                             @Param("gender") Integer gender);
+
+    Integer updateStudentPerformanceByStudentNo(@Param("studentNo") Integer studentNo,
+                                                @Param("gpa") BigDecimal gpa,
+                                                @Param("gradeClass") Integer gradeClass);
+
+    Integer softDeleteStudentByStudentNo(@Param("studentNo") Integer studentNo);
 }

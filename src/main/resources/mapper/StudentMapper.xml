@@ -105,6 +105,24 @@
         <include refid="StudentOverviewOrderBy"/>
     </select>
 
+    <select id="selectStudentOverviewRowByStudentNo" resultMap="StudentOverviewRowResultMap">
+        SELECT
+        s.student_no,
+        s.name,
+        s.age,
+        s.gender,
+        s.grade_level,
+        s.class_name,
+        p.gpa,
+        p.grade_class,
+        GREATEST(s.updated_at, COALESCE(p.updated_at, s.updated_at)) AS update_time
+        FROM student s
+        LEFT JOIN student_performance p ON p.student_id = s.id
+        WHERE s.deleted = 0
+        AND s.student_no = #{studentNo}
+        LIMIT 1
+    </select>
+
     <select id="searchStudentOverviewRows" resultMap="StudentOverviewRowResultMap">
         SELECT
         s.student_no,
@@ -211,31 +229,91 @@
 
     <select id="selectStudentDetailAggregateRow" resultMap="StudentDetailAggregateRowResultMap">
         SELECT
-        s.student_no AS overview_student_no,
-        s.name AS overview_name,
-        s.age AS overview_age,
-        s.gender AS overview_gender,
-        s.grade_level AS overview_grade_level,
-        s.class_name AS overview_class_name,
-        p.gpa AS overview_gpa,
-        p.grade_class AS overview_grade_class,
-        GREATEST(s.updated_at, COALESCE(p.updated_at, s.updated_at)) AS overview_update_time,
-        p.study_time_weekly AS detail_study_time_weekly,
-        p.absences AS detail_absences,
-        p.tutoring AS detail_tutoring,
-        p.parental_support AS detail_parental_support,
-        p.extracurricular AS detail_extracurricular,
-        p.sports AS detail_sports,
-        p.music AS detail_music,
-        p.volunteering AS detail_volunteering,
-        p.gpa AS detail_gpa,
-        p.grade_class AS detail_grade_class,
-        CASE WHEN p.id IS NULL THEN 0 ELSE 1 END AS performance_available
-        FROM student s
-        LEFT JOIN student_performance p ON p.student_id = s.id
-        WHERE s.deleted = 0
-        AND s.student_no = #{studentNo}
+            s.student_no AS overview_student_no,
+            s.name AS overview_name,
+            s.age AS overview_age,
+            s.gender AS overview_gender,
+            s.grade_level AS overview_grade_level,
+            s.class_name AS overview_class_name,
+
+            p.gpa AS overview_gpa,
+            p.grade_class AS overview_grade_class,
+
+            GREATEST(
+                s.updated_at,
+                COALESCE(p.updated_at, s.updated_at)
+            ) AS overview_update_time,
+
+            p.study_time_weekly AS detail_study_time_weekly,
+            p.absences AS detail_absences,
+            p.tutoring AS detail_tutoring,
+            p.parental_support AS detail_parental_support,
+            p.extracurricular AS detail_extracurricular,
+            p.sports AS detail_sports,
+            p.music AS detail_music,
+            p.volunteering AS detail_volunteering,
+            p.gpa AS detail_gpa,
+            p.grade_class AS detail_grade_class,
+
+            CASE
+                WHEN p.id IS NULL THEN 0
+                ELSE 1
+            END AS performance_available
+
+            FROM student s
+            LEFT JOIN student_performance p
+                    ON p.student_id = s.id
+            WHERE s.deleted = 0
+            AND s.student_no = #{studentNo}
         LIMIT 1
     </select>
+
+    <update id="updateStudentOverviewByStudentNo">
+        UPDATE student
+        <set>
+            <if test="name != null">
+                name = #{name},
+            </if>
+            <if test="age != null">
+                age = #{age},
+            </if>
+            <if test="gradeLevel != null">
+                grade_level = #{gradeLevel},
+            </if>
+            <if test="className != null">
+                class_name = #{className},
+            </if>
+            <if test="gender != null">
+                gender = #{gender},
+            </if>
+            updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE deleted = 0
+        AND student_no = #{studentNo}
+    </update>
+
+    <update id="updateStudentPerformanceByStudentNo">
+        UPDATE student_performance p
+        INNER JOIN student s ON s.id = p.student_id
+        <set>
+            <if test="gpa != null">
+                p.gpa = #{gpa},
+            </if>
+            <if test="gradeClass != null">
+                p.grade_class = #{gradeClass},
+            </if>
+            p.updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE s.deleted = 0
+        AND s.student_no = #{studentNo}
+    </update>
+
+    <update id="softDeleteStudentByStudentNo">
+        UPDATE student
+        SET deleted = 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE deleted = 0
+        AND student_no = #{studentNo}
+    </update>
 
 </mapper>
