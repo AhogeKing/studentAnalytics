@@ -32,8 +32,7 @@ python/importer/.env
 #scripts
 scripts/import_student_data_ori.py
 
-# frontend
-frontend
+#frontend
 
 # .vscode
 .vscode
