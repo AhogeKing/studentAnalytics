@@ -1,6 +1,7 @@
 package com.ahogeking.studentanalytics.controller;
 
 import com.ahogeking.studentanalytics.common.Result;
+import com.ahogeking.studentanalytics.dto.AnalysisScopeQueryRequest;
 import com.ahogeking.studentanalytics.service.AnalyticsService;
 import com.ahogeking.studentanalytics.vo.GpaDistributionItemVO;
 import com.ahogeking.studentanalytics.vo.GradeClassDistributionItemVO;
@@ -8,6 +9,7 @@ import com.ahogeking.studentanalytics.vo.PerformanceAnalysisPointVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -60,8 +62,12 @@ public class AnalyticsController {
          symbolSize 由前端计算，后端不返回像素大小
      */
     @GetMapping("/gpa-distribution")
-    public Result<List<GpaDistributionItemVO>> getGpaDistribution() {
-        return Result.success(analyticsService.selectGpaDistributionItems());
+    public Result<List<GpaDistributionItemVO>> getGpaDistribution(
+            @RequestParam(name = "grade_level", required = false) Integer gradeLevel,
+            @RequestParam(name = "class_name", required = false) List<String> classNames
+    ) {
+        AnalysisScopeQueryRequest queryRequest = new AnalysisScopeQueryRequest(gradeLevel, classNames);
+        return Result.success(analyticsService.selectGpaDistributionItems(queryRequest));
     }
 
     // GradeClass 柱状图
@@ -96,8 +102,12 @@ public class AnalyticsController {
         GradeClass 中文标签继续复用已有：GradeClassEnum、OptionVO<Integer>
      */
     @GetMapping("/grade-class-distribution")
-    public Result<List<GradeClassDistributionItemVO>> getGradeClassDistribution() {
-        return Result.success(analyticsService.selectGradeClassDistributionItems());
+    public Result<List<GradeClassDistributionItemVO>> getGradeClassDistribution(
+            @RequestParam(name = "grade_level", required = false) Integer gradeLevel,
+            @RequestParam(name = "class_name", required = false) List<String> classNames
+    ) {
+        AnalysisScopeQueryRequest queryRequest = new AnalysisScopeQueryRequest(gradeLevel, classNames);
+        return Result.success(analyticsService.selectGradeClassDistributionItems(queryRequest));
     }
 
     // 统一表现点接口
@@ -160,8 +170,12 @@ public class AnalyticsController {
         * 五级颜色：按照 grade_class.value 着色。
      */
     @GetMapping("/performance-points")
-    public Result<List<PerformanceAnalysisPointVO>> getPerformancePoints() {
-        return Result.success(analyticsService.selectPerformanceAnalysisPoints());
+    public Result<List<PerformanceAnalysisPointVO>> getPerformancePoints(
+            @RequestParam(name = "grade_level", required = false) Integer gradeLevel,
+            @RequestParam(name = "class_name", required = false) List<String> classNames
+    ) {
+        AnalysisScopeQueryRequest queryRequest = new AnalysisScopeQueryRequest(gradeLevel, classNames);
+        return Result.success(analyticsService.selectPerformanceAnalysisPoints(queryRequest));
     }
     // 缺勤-GPA 学习时长-GPA 三变量联合散点图
 }

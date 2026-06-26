@@ -13,4 +13,7 @@ public class PerformanceAnalysisPointRow {
     private Integer absences;
     private BigDecimal gpa;
     private Integer gradeClass;
+
+    private Integer gradeLevel;
+    private String className;
 }

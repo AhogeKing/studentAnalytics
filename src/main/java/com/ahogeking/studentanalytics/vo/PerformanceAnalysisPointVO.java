@@ -18,6 +18,8 @@ public class PerformanceAnalysisPointVO {
     private Integer studentNo;
     private String name;
 
+    private ClassInfoVO classInfo;
+
     private BigDecimal studyTimeWeekly;
     private Integer absences;
     private BigDecimal gpa;

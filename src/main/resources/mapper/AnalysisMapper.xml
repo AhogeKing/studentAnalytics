@@ -4,6 +4,24 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ahogeking.studentanalytics.mapper.AnalysisMapper">
 
+    <sql id="AnalysisScopeCondition">
+        <if test="gradeLevel != null">
+            AND s.grade_level = #{gradeLevel}
+        </if>
+
+        <if test="classNames != null
+              and classNames.size() > 0">
+            AND s.class_name IN
+            <foreach collection="classNames"
+                     item="className"
+                     open="("
+                     separator=","
+                     close=")">
+                #{className}
+            </foreach>
+        </if>
+    </sql>
+
     <resultMap id="AnalysisCategoryCountRowResultMap"
                type="com.ahogeking.studentanalytics.dto.row.AnalysisCategoryCountRow">
         <result column="category_value" property="categoryValue"/>
@@ -18,62 +36,89 @@
         <result column="absences" property="absences"/>
         <result column="gpa" property="gpa"/>
         <result column="grade_class" property="gradeClass"/>
+        <result column="grade_level" property="gradeLevel"/>
+        <result column="class_name" property="className"/>
     </resultMap>
 
     <select id="selectGpaBucketCounts"
             resultMap="AnalysisCategoryCountRowResultMap">
         SELECT
-            CASE
-                WHEN p.gpa &lt; 0.5000 THEN 0
-                WHEN p.gpa &lt; 1.0000 THEN 1
-                WHEN p.gpa &lt; 1.5000 THEN 2
-                WHEN p.gpa &lt; 2.0000 THEN 3
-                WHEN p.gpa &lt; 2.5000 THEN 4
-                WHEN p.gpa &lt; 3.0000 THEN 5
-                WHEN p.gpa &lt; 3.5000 THEN 6
-                ELSE 7
-            END AS category_value,
-            COUNT(*) AS student_count
+        CASE
+        WHEN p.gpa &lt; 0.5000 THEN 0
+        WHEN p.gpa &lt; 1.0000 THEN 1
+        WHEN p.gpa &lt; 1.5000 THEN 2
+        WHEN p.gpa &lt; 2.0000 THEN 3
+        WHEN p.gpa &lt; 2.5000 THEN 4
+        WHEN p.gpa &lt; 3.0000 THEN 5
+        WHEN p.gpa &lt; 3.5000 THEN 6
+        ELSE 7
+        END AS category_value,
+        COUNT(*) AS student_count
+
         FROM student s
+
         INNER JOIN student_performance p
-            ON p.student_id = s.id
+        ON p.student_id = s.id
+
         WHERE s.deleted = 0
-            AND p.gpa IS NOT NULL
+        AND p.gpa IS NOT NULL
+
+        <include refid="AnalysisScopeCondition"/>
+
         GROUP BY category_value
         ORDER BY category_value
     </select>
 
     <select id="selectGradeClassCounts"
             resultMap="AnalysisCategoryCountRowResultMap">
+
         SELECT
-          p.grade_class AS category_value,
-            COUNT(*) AS student_count
+        p.grade_class AS category_value,
+        COUNT(*) AS student_count
+
         FROM student s
+
         INNER JOIN student_performance p
-            ON p.student_id = s.id
+        ON p.student_id = s.id
+
         WHERE s.deleted = 0
-            AND p.grade_class IS NOT NULL
+        AND p.grade_class IS NOT NULL
+
+        <include refid="AnalysisScopeCondition"/>
+
         GROUP BY p.grade_class
         ORDER BY p.grade_class
     </select>
 
     <select id="selectPerformanceAnalysisPoints"
             resultMap="PerformanceAnalysisPointRowResultMap">
+
         SELECT
-            s.student_no,
-            s.name,
-            p.study_time_weekly,
-            p.absences,
-            p.gpa,
-            p.grade_class
+        s.student_no,
+        s.name,
+        s.grade_level,
+        s.class_name,
+        p.study_time_weekly,
+        p.absences,
+        p.gpa,
+        p.grade_class
+
         FROM student s
+
         INNER JOIN student_performance p
-            ON p.student_id = s.id
+        ON p.student_id = s.id
+
         WHERE s.deleted = 0
-            AND p.study_time_weekly IS NOT NULL
-            AND p.absences IS NOT NULL
-            AND p.gpa IS NOT NULL
-        ORDER BY s.student_no
+        AND p.study_time_weekly IS NOT NULL
+        AND p.absences IS NOT NULL
+        AND p.gpa IS NOT NULL
+
+        <include refid="AnalysisScopeCondition"/>
+
+        ORDER BY
+        s.grade_level,
+        s.class_name,
+        s.student_no
     </select>
 
 </mapper>
