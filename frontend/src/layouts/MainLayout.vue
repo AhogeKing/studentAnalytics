@@ -47,23 +47,20 @@ onMounted(async () => {
 
       <nav class="app-nav" aria-label="主导航">
         <RouterLink :to="{ name: 'students' }">学生概览</RouterLink>
+        <RouterLink :to="{ name: 'analytics' }">分析图表</RouterLink>
       </nav>
 
-      <el-dropdown trigger="click">
-        <button class="user-menu" type="button">
+      <div class="topbar-account">
+        <div class="user-menu" aria-label="当前用户">
           <el-icon><UserFilled /></el-icon>
           <span>{{ authStore.displayName }}</span>
           <small v-if="authStore.role">{{ authStore.role }}</small>
-        </button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item @click="handleLogout">
-              <el-icon><SwitchButton /></el-icon>
-              退出登录
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+        </div>
+        <el-button class="logout-button" type="danger" plain @click="handleLogout">
+          <el-icon><SwitchButton /></el-icon>
+          退出登录
+        </el-button>
+      </div>
     </header>
 
     <RouterView />

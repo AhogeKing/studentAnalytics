@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getToken } from "../stores/auth";
 import MainLayout from "../layouts/MainLayout.vue";
+import AnalysisChartsView from "../views/AnalysisChartsView.vue";
 import LoginView from "../views/LoginView.vue";
 import StudentDetailView from "../views/StudentDetailView.vue";
 import StudentOverviewView from "../views/StudentOverviewView.vue";
@@ -30,6 +31,11 @@ const router = createRouter({
           path: "students",
           name: "students",
           component: StudentOverviewView
+        },
+        {
+          path: "analytics",
+          name: "analytics",
+          component: AnalysisChartsView
         },
         {
           path: "students/:studentNo",

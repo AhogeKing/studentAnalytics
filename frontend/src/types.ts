@@ -153,3 +153,63 @@ export interface StudentDetail {
   activity_profile?: ActivityProfile | null;
   performance_available: boolean;
 }
+
+export interface GpaDistributionItem {
+  bucketIndex?: number;
+  bucket_index?: number;
+  label: string;
+  minGpa?: number;
+  min_gpa?: number;
+  maxGpa?: number;
+  max_gpa?: number;
+  studentCount?: number;
+  student_count?: number;
+  percentage: number;
+}
+
+export interface GradeClassDistributionItem {
+  gradeClass?: OptionVO<number>;
+  grade_class?: OptionVO<number>;
+  studentCount?: number;
+  student_count?: number;
+  percentage: number;
+}
+
+export interface PerformanceAnalysisPoint {
+  studentNo?: number;
+  student_no?: number;
+  name: string;
+  studyTimeWeekly?: number;
+  study_time_weekly?: number;
+  absences: number;
+  gpa: number;
+  gradeClass?: OptionVO<number>;
+  grade_class?: OptionVO<number>;
+  gpaBucket?: OptionVO<number>;
+  gpa_bucket?: OptionVO<number>;
+}
+
+export interface NormalizedGpaDistributionItem {
+  bucketIndex: number;
+  label: string;
+  minGpa: number;
+  maxGpa: number;
+  studentCount: number;
+  percentage: number;
+}
+
+export interface NormalizedGradeClassDistributionItem {
+  gradeClass: OptionVO<number>;
+  studentCount: number;
+  percentage: number;
+}
+
+export interface NormalizedPerformanceAnalysisPoint {
+  studentNo: number;
+  name: string;
+  studyTimeWeekly: number;
+  absences: number;
+  gpa: number;
+  gradeClass: OptionVO<number>;
+  gpaBucket: OptionVO<number>;
+}
