@@ -14,7 +14,7 @@ dataset/Student_performance_data_.csv
 
 # docs
 doc/*
-!doc/
+#!doc/
 !doc/TODO.md
 !doc/utility-classes-usage.md
 .DS_Store
