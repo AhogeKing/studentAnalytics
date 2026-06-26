@@ -5,7 +5,6 @@ import com.ahogeking.studentanalytics.service.AnalyticsService;
 import com.ahogeking.studentanalytics.vo.GpaDistributionItemVO;
 import com.ahogeking.studentanalytics.vo.GradeClassDistributionItemVO;
 import com.ahogeking.studentanalytics.vo.PerformanceAnalysisPointVO;
-import com.ahogeking.studentanalytics.vo.StudentDetailVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
