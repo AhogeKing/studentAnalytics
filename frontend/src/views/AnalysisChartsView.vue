@@ -8,18 +8,23 @@ import {
   fetchGradeClassDistribution,
   fetchPerformanceAnalysisPoints
 } from "../api/analytics";
+import { fetchStudentFilterOptions } from "../api/students";
 import AnalysisChartCard from "../components/analysis/AnalysisChartCard.vue";
+import AnalysisScopeSelector from "../components/analysis/AnalysisScopeSelector.vue";
 import type {
+  AnalysisColorMode,
+  AnalysisDisplayMode,
+  AnalysisScopeMode,
+  AnalysisScopeParams,
+  ClassInfo,
   GpaDistributionItem,
   GradeClassDistributionItem,
   NormalizedGpaDistributionItem,
   NormalizedGradeClassDistributionItem,
   NormalizedPerformanceAnalysisPoint,
-  PerformanceAnalysisPoint
+  PerformanceAnalysisPoint,
+  StudentFilterOptions
 } from "../types";
-
-type ColorMode = "gradeClass" | "gpaBucket";
-type DisplayMode = "dim" | "only";
 
 interface GroupMeta {
   value: number;
@@ -38,13 +43,18 @@ interface GpaBucketMeta {
 
 const router = useRouter();
 const loading = ref(false);
+const scopeOptionsLoading = ref(false);
 const error = ref("");
+const filterOptions = ref<StudentFilterOptions | null>(null);
 const gpaDistribution = ref<NormalizedGpaDistributionItem[]>([]);
 const gradeClassDistribution = ref<NormalizedGradeClassDistributionItem[]>([]);
 const performancePoints = ref<NormalizedPerformanceAnalysisPoint[]>([]);
-const colorMode = ref<ColorMode>("gradeClass");
+const scopeMode = ref<AnalysisScopeMode>("all");
+const selectedGradeLevel = ref<number | undefined>();
+const selectedClassNames = ref<string[]>([]);
+const colorMode = ref<AnalysisColorMode>("gradeClass");
 const focusedGroup = ref<number | null>(null);
-const displayMode = ref<DisplayMode>("dim");
+const displayMode = ref<AnalysisDisplayMode>("dim");
 
 const gradeColors: Record<number, string> = {
   0: "#2563eb",
@@ -90,10 +100,44 @@ const averageAbsences = computed(() => average(performancePoints.value.map((item
 const averageStudyTime = computed(() => average(performancePoints.value.map((item) => item.studyTimeWeekly)).toFixed(1));
 const absenceAxisMax = computed(() => niceAxisMax(performancePoints.value.map((item) => item.absences)));
 const studyTimeAxisMax = computed(() => niceAxisMax(performancePoints.value.map((item) => item.studyTimeWeekly)));
+const classOptions = computed(() => normalizeClassOptions(filterOptions.value?.classes ?? []));
+const analysisParams = computed<AnalysisScopeParams>(() => {
+  if (scopeMode.value === "all" || !selectedGradeLevel.value) {
+    return {};
+  }
+
+  if (scopeMode.value === "grade") {
+    return { grade_level: selectedGradeLevel.value };
+  }
+
+  return {
+    grade_level: selectedGradeLevel.value,
+    class_name: selectedClassNames.value.length ? selectedClassNames.value : undefined
+  };
+});
+const currentScopeLabel = computed(() => {
+  if (scopeMode.value === "all") {
+    return "全部学生";
+  }
+
+  const gradeName = selectedGradeLevel.value ? gradeNameMap[selectedGradeLevel.value] : "未选择年级";
+  if (scopeMode.value === "grade" || !selectedClassNames.value.length) {
+    return `${gradeName}全部班级`;
+  }
+
+  const classLabels = selectedClassNames.value.map((className) => getClassDisplayName(className)).join("、");
+  return `${gradeName}：${classLabels}`;
+});
 
 const maxGpaBucketCount = computed(() =>
   Math.max(0, ...gpaDistribution.value.map((item) => item.studentCount))
 );
+
+const gradeNameMap: Record<number, string> = {
+  1: "高一",
+  2: "高二",
+  3: "高三"
+};
 
 const gradeClassGroups = computed<GroupMeta[]>(() => {
   const labelMap = new Map<number, string>();
@@ -299,14 +343,34 @@ watch(colorMode, () => {
   focusedGroup.value = null;
 });
 
+watch(scopeMode, (mode) => {
+  if (mode === "all") {
+    selectedGradeLevel.value = undefined;
+    selectedClassNames.value = [];
+  }
+  if (mode === "grade") {
+    selectedClassNames.value = [];
+  }
+});
+
+async function loadFilterOptions() {
+  scopeOptionsLoading.value = true;
+  try {
+    filterOptions.value = await fetchStudentFilterOptions();
+  } finally {
+    scopeOptionsLoading.value = false;
+  }
+}
+
 async function loadCharts() {
   loading.value = true;
   error.value = "";
   try {
+    const params = analysisParams.value;
     const [gpaItems, gradeItems, points] = await Promise.all([
-      fetchGpaDistribution(),
-      fetchGradeClassDistribution(),
-      fetchPerformanceAnalysisPoints()
+      fetchGpaDistribution(params),
+      fetchGradeClassDistribution(params),
+      fetchPerformanceAnalysisPoints(params)
     ]);
     gpaDistribution.value = normalizeGpaDistribution(gpaItems);
     gradeClassDistribution.value = normalizeGradeDistribution(gradeItems);
@@ -316,6 +380,19 @@ async function loadCharts() {
   } finally {
     loading.value = false;
   }
+}
+
+function applyScope() {
+  focusedGroup.value = null;
+  void loadCharts();
+}
+
+function resetScope() {
+  scopeMode.value = "all";
+  selectedGradeLevel.value = undefined;
+  selectedClassNames.value = [];
+  focusedGroup.value = null;
+  void loadCharts();
 }
 
 function normalizeGpaDistribution(items: GpaDistributionItem[]): NormalizedGpaDistributionItem[] {
@@ -344,6 +421,7 @@ function normalizePerformancePoints(items: PerformanceAnalysisPoint[]): Normaliz
       return {
         studentNo: Number(item.studentNo ?? item.student_no ?? 0),
         name: item.name,
+        classInfo: item.classInfo ?? item.class_info ?? null,
         studyTimeWeekly: Number(item.studyTimeWeekly ?? item.study_time_weekly ?? 0),
         absences: Number(item.absences ?? 0),
         gpa,
@@ -352,6 +430,17 @@ function normalizePerformancePoints(items: PerformanceAnalysisPoint[]): Normaliz
       };
     })
     .filter((item) => item.studentNo > 0);
+}
+
+function normalizeClassOptions(items: ClassInfo[]): ClassInfo[] {
+  return items
+    .map((item) => ({
+      grade_level: Number(item.grade_level),
+      raw_class_name: item.raw_class_name,
+      class_name: item.class_name
+    }))
+    .filter((item) => Number.isFinite(item.grade_level) && item.raw_class_name)
+    .sort((left, right) => left.raw_class_name.localeCompare(right.raw_class_name, "zh-Hans-CN", { numeric: true }));
 }
 
 function resolveGpaBucket(gpa: number) {
@@ -435,6 +524,7 @@ function buildScatterOption(config: {
 function studentTooltip(point: NormalizedPerformanceAnalysisPoint, extraLine?: string) {
   return [
     `学生：${point.studentNo} · ${point.name}`,
+    `班级：${point.classInfo?.class_name ?? "-"}`,
     extraLine,
     `学习时长：${point.studyTimeWeekly.toFixed(2)} 小时`,
     `缺勤次数：${point.absences}`,
@@ -486,13 +576,17 @@ function buildGroupedScatterSeries(valueBuilder: (point: NormalizedPerformanceAn
   }) as EChartsOption["series"];
 }
 
-function getPointGroup(point: NormalizedPerformanceAnalysisPoint, mode: ColorMode) {
+function getPointGroup(point: NormalizedPerformanceAnalysisPoint, mode: AnalysisColorMode) {
   const option = mode === "gradeClass" ? point.gradeClass : point.gpaBucket;
   return option.value === null ? Number.NaN : Number(option.value);
 }
 
-function countPointsByGroup(value: number, mode: ColorMode) {
+function countPointsByGroup(value: number, mode: AnalysisColorMode) {
   return performancePoints.value.filter((point) => getPointGroup(point, mode) === value).length;
+}
+
+function getClassDisplayName(rawClassName: string) {
+  return classOptions.value.find((item) => item.raw_class_name === rawClassName)?.class_name ?? rawClassName;
 }
 
 function resetFocus() {
@@ -503,11 +597,11 @@ function toggleFocus(value: number) {
   focusedGroup.value = focusedGroup.value === value ? null : value;
 }
 
-function setColorMode(mode: ColorMode) {
+function setColorMode(mode: AnalysisColorMode) {
   colorMode.value = mode;
 }
 
-function setDisplayMode(mode: DisplayMode) {
+function setDisplayMode(mode: AnalysisDisplayMode) {
   displayMode.value = mode;
 }
 
@@ -549,6 +643,7 @@ function handleLegendToggle(params: unknown) {
 }
 
 onMounted(() => {
+  void loadFilterOptions();
   void loadCharts();
 });
 </script>
@@ -558,7 +653,7 @@ onMounted(() => {
     <div>
       <p class="eyebrow">分析图表</p>
       <h1>学生成绩分析</h1>
-      <p>围绕 GPA、成绩等级、缺勤次数和每周学习时长，展示当前学生表现记录的五类可视化。</p>
+      <p>当前范围：{{ currentScopeLabel }}。围绕 GPA、成绩等级、缺勤次数和每周学习时长展示五类可视化。</p>
     </div>
     <div class="head-actions">
       <el-button :loading="loading" type="primary" @click="loadCharts">
@@ -568,11 +663,22 @@ onMounted(() => {
     </div>
   </section>
 
+  <AnalysisScopeSelector
+    v-model:mode="scopeMode"
+    v-model:grade-level="selectedGradeLevel"
+    v-model:class-names="selectedClassNames"
+    :classes="classOptions"
+    :loading="loading || scopeOptionsLoading"
+    :current-scope-label="currentScopeLabel"
+    @apply="applyScope"
+    @reset="resetScope"
+  />
+
   <section class="analysis-summary">
     <article>
       <span>表现点数量</span>
       <strong>{{ totalStudents }}</strong>
-      <small>参与散点分析的学生记录</small>
+      <small>{{ currentScopeLabel }}参与散点分析的学生记录</small>
     </article>
     <article>
       <span>平均 GPA</span>

@@ -179,6 +179,8 @@ export interface PerformanceAnalysisPoint {
   studentNo?: number;
   student_no?: number;
   name: string;
+  classInfo?: ClassInfo;
+  class_info?: ClassInfo;
   studyTimeWeekly?: number;
   study_time_weekly?: number;
   absences: number;
@@ -207,9 +209,19 @@ export interface NormalizedGradeClassDistributionItem {
 export interface NormalizedPerformanceAnalysisPoint {
   studentNo: number;
   name: string;
+  classInfo?: ClassInfo | null;
   studyTimeWeekly: number;
   absences: number;
   gpa: number;
   gradeClass: OptionVO<number>;
   gpaBucket: OptionVO<number>;
 }
+
+export interface AnalysisScopeParams {
+  grade_level?: number;
+  class_name?: string[];
+}
+
+export type AnalysisScopeMode = "all" | "grade" | "classes";
+export type AnalysisColorMode = "gradeClass" | "gpaBucket";
+export type AnalysisDisplayMode = "dim" | "only";

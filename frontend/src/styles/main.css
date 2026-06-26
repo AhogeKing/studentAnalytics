@@ -157,6 +157,7 @@ a {
 .class-strip,
 .detail-section,
 .analysis-card,
+.analysis-scope-panel,
 .analysis-focus-panel,
 .analysis-summary article {
   border: 1px solid var(--sa-border);
@@ -533,6 +534,67 @@ a {
   margin-bottom: 14px;
 }
 
+.analysis-scope-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.scope-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scope-mode-grid button {
+  display: grid;
+  min-height: 74px;
+  align-content: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #d8e8ec;
+  border-radius: 8px;
+  background: #f8fcfd;
+  color: var(--sa-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.scope-mode-grid button:hover,
+.scope-mode-grid button:focus-visible,
+.scope-mode-grid button.active {
+  border-color: rgba(8, 145, 178, 0.28);
+  background: #ffffff;
+  color: var(--sa-ink);
+  box-shadow: 0 14px 34px rgba(18, 49, 58, 0.08);
+  outline: none;
+}
+
+.scope-mode-grid span {
+  color: var(--sa-ink);
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.scope-mode-grid small {
+  line-height: 1.35;
+}
+
+.scope-form-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 10px;
+}
+
 .analysis-summary article {
   min-height: 118px;
   padding: 18px;
@@ -768,6 +830,7 @@ a {
   .class-strip,
   .detail-section,
   .analysis-focus-panel,
+  .analysis-scope-panel,
   .user-menu {
     transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease;
   }
@@ -820,14 +883,15 @@ a {
 
   .topbar-account {
     justify-content: stretch;
+    flex-wrap: wrap;
   }
 
   .topbar-account .user-menu {
-    flex: 1 1 auto;
+    flex: 1 1 min(100%, 220px);
   }
 
   .logout-button {
-    flex: 0 0 auto;
+    flex: 1 1 120px;
   }
 
   .page-head,
@@ -850,7 +914,9 @@ a {
   .query-grid,
   .detail-layout,
   .analysis-summary,
-  .analysis-grid {
+  .analysis-grid,
+  .scope-mode-grid,
+  .scope-form-grid {
     grid-template-columns: 1fr;
   }
 
@@ -881,6 +947,7 @@ a {
   .content-panel,
   .query-panel,
   .detail-section,
+  .analysis-scope-panel,
   .analysis-focus-panel,
   .analysis-card {
     padding: 14px;
@@ -911,6 +978,10 @@ a {
 
   .focus-segment button {
     padding: 0 8px;
+  }
+
+  .scope-actions .el-button {
+    flex: 1 1 100%;
   }
 
   .query-actions,
