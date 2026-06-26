@@ -22,4 +22,11 @@ public class PerformanceAnalysisPointVO {
     private Integer absences;
     private BigDecimal gpa;
     private OptionVO<Integer> gradeClass;
+
+    /**
+     * GPA 所属区间，例如：
+     * value = 7
+     * label = "[3.5, 4.0]"
+     */
+    private OptionVO<Integer> gpaBucket;
 }

@@ -4,6 +4,7 @@ import com.ahogeking.studentanalytics.dto.row.AnalysisCategoryCountRow;
 import com.ahogeking.studentanalytics.dto.row.PerformanceAnalysisPointRow;
 import com.ahogeking.studentanalytics.mapper.AnalysisMapper;
 import com.ahogeking.studentanalytics.service.AnalyticsService;
+import com.ahogeking.studentanalytics.vo.GpaBucketEnum;
 import com.ahogeking.studentanalytics.vo.GradeClassEnum;
 import com.ahogeking.studentanalytics.vo.GpaDistributionItemVO;
 import com.ahogeking.studentanalytics.vo.GradeClassDistributionItemVO;
@@ -26,33 +27,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
-    private static final List<GpaBucket> GPA_BUCKETS = List.of(
-            new GpaBucket(0, "[0.0, 0.5)",
-                    new BigDecimal("0.0"),
-                    new BigDecimal("0.5")),
-            new GpaBucket(1, "[0.5, 1.0)",
-                    new BigDecimal("0.5"),
-                    new BigDecimal("1.0")),
-            new GpaBucket(2, "[1.0, 1.5)",
-                    new BigDecimal("1.0"),
-                    new BigDecimal("1.5")),
-            new GpaBucket(3, "[1.5, 2.0)",
-                    new BigDecimal("1.5"),
-                    new BigDecimal("2.0")),
-            new GpaBucket(4, "[2.0, 2.5)",
-                    new BigDecimal("2.0"),
-                    new BigDecimal("2.5")),
-            new GpaBucket(5, "[2.5, 3.0)",
-                    new BigDecimal("2.5"),
-                    new BigDecimal("3.0")),
-            new GpaBucket(6, "[3.0, 3.5)",
-                    new BigDecimal("3.0"),
-                    new BigDecimal("3.5")),
-            new GpaBucket(7, "[3.5, 4.0]",
-                    new BigDecimal("3.5"),
-                    new BigDecimal("4.0"))
-    );
-
     private final AnalysisMapper analysisMapper;
 
     @Override
@@ -64,14 +38,15 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 .mapToLong(Long::longValue)
                 .sum();
 
-        return GPA_BUCKETS.stream()
+        return Arrays.stream(GpaBucketEnum.values())
+                .sorted((left, right) -> Integer.compare(left.getCode(), right.getCode()))
                 .map(bucket -> {
-                    long count = countMap.getOrDefault(bucket.index(), 0L);
+                    long count = countMap.getOrDefault(bucket.getCode(), 0L);
                     return new GpaDistributionItemVO(
-                            bucket.index(),
-                            bucket.label(),
-                            bucket.minGpa(),
-                            bucket.maxGpa(),
+                            bucket.getCode(),
+                            bucket.getLabel(),
+                            bucket.getMin(),
+                            bucket.getMax(),
                             count,
                             calculatePercentage(count, total)
                     );
@@ -116,7 +91,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 row.getStudyTimeWeekly(),
                 row.getAbsences(),
                 row.getGpa(),
-                GradeClassEnum.toOption(row.getGradeClass())
+                GradeClassEnum.toOption(row.getGradeClass()),
+                GpaBucketEnum.toOption(row.getGpa())
         );
     }
 
@@ -140,11 +116,4 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
     }
 
-    private record GpaBucket(
-            int index,
-            String label,
-            BigDecimal minGpa,
-            BigDecimal maxGpa
-    ) {
-    }
 }
