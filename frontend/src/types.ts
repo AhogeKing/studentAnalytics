@@ -68,6 +68,79 @@ export interface OptionVO<T> {
   label: string;
 }
 
+export interface OperationLog {
+  id: number;
+  userId?: number | null;
+  user_id?: number | null;
+  username?: string | null;
+  realName?: string | null;
+  real_name?: string | null;
+  userRole?: string | null;
+  user_role?: string | null;
+  userRoleLabel?: string | null;
+  user_role_label?: string | null;
+  moduleName?: string | null;
+  module_name?: string | null;
+  moduleLabel?: string | null;
+  module_label?: string | null;
+  operationType?: string | null;
+  operation_type?: string | null;
+  operationTypeLabel?: string | null;
+  operation_type_label?: string | null;
+  operationResult?: string | null;
+  operation_result?: string | null;
+  operationResultLabel?: string | null;
+  operation_result_label?: string | null;
+  targetType?: string | null;
+  target_type?: string | null;
+  targetTypeLabel?: string | null;
+  target_type_label?: string | null;
+  targetId?: string | null;
+  target_id?: string | null;
+  businessKey?: string | null;
+  business_key?: string | null;
+  operationSummary?: string | null;
+  operation_summary?: string | null;
+  requestMethod?: string | null;
+  request_method?: string | null;
+  requestUri?: string | null;
+  request_uri?: string | null;
+  ipAddress?: string | null;
+  ip_address?: string | null;
+  requestParams?: string | null;
+  request_params?: string | null;
+  requestBody?: string | null;
+  request_body?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+}
+
+export interface OperationLogQuery {
+  page_num?: number;
+  page_size?: number;
+  username?: string;
+  user_role?: string;
+  module_name?: string;
+  operation_type?: string;
+  operation_result?: string;
+  target_type?: string;
+  target_id?: string;
+  business_key?: string;
+  start_time?: string;
+  end_time?: string;
+  keyword?: string;
+}
+
+export interface OperationLogOptions {
+  modules: OptionVO<string>[];
+  operationTypes?: OptionVO<string>[];
+  operation_types?: OptionVO<string>[];
+  results: OptionVO<string>[];
+  roles: OptionVO<string>[];
+  targetTypes?: OptionVO<string>[];
+  target_types?: OptionVO<string>[];
+}
+
 export interface ClassInfo {
   grade_level: number;
   class_name: string;

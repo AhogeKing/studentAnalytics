@@ -2,7 +2,7 @@
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { DataAnalysis, SwitchButton, UserFilled } from "@element-plus/icons-vue";
+import { DataAnalysis, DocumentChecked, SwitchButton, UserFilled } from "@element-plus/icons-vue";
 import { fetchMe, logout } from "../api/auth";
 import { useAuthStore } from "../stores/auth";
 
@@ -50,6 +50,10 @@ onMounted(async () => {
         <RouterLink :to="{ name: 'students' }">学生概览</RouterLink>
         <RouterLink :to="{ name: 'analytics' }">分析图表</RouterLink>
         <RouterLink v-if="canManageUsers" :to="{ name: 'admin-users' }">用户管理</RouterLink>
+        <RouterLink v-if="canManageUsers" :to="{ name: 'operation-logs' }">
+          <el-icon><DocumentChecked /></el-icon>
+          操作日志
+        </RouterLink>
       </nav>
 
       <div class="topbar-account">

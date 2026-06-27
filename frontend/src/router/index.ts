@@ -4,6 +4,7 @@ import AdminUsersView from "../views/AdminUsersView.vue";
 import MainLayout from "../layouts/MainLayout.vue";
 import AnalysisChartsView from "../views/AnalysisChartsView.vue";
 import LoginView from "../views/LoginView.vue";
+import OperationLogsView from "../views/OperationLogsView.vue";
 import StudentDetailView from "../views/StudentDetailView.vue";
 import StudentOverviewView from "../views/StudentOverviewView.vue";
 
@@ -42,6 +43,12 @@ const router = createRouter({
           path: "admin/users",
           name: "admin-users",
           component: AdminUsersView,
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: "admin/operation-logs",
+          name: "operation-logs",
+          component: OperationLogsView,
           meta: { requiresAdmin: true }
         },
         {

@@ -268,6 +268,10 @@ a {
 }
 
 .app-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 112px;
   padding: 9px 16px;
   border-radius: 7px;
@@ -537,6 +541,177 @@ a {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 14px;
+}
+
+.operation-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.operation-summary article {
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid var(--sa-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--sa-shadow);
+}
+
+.operation-summary span {
+  display: block;
+  color: var(--sa-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.operation-summary strong {
+  display: block;
+  margin: 10px 0 8px;
+  color: var(--sa-ink);
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  line-height: 1;
+}
+
+.operation-summary small {
+  color: var(--sa-muted);
+  line-height: 1.45;
+}
+
+.operation-log-query-grid {
+  grid-template-columns: repeat(6, minmax(138px, 1fr));
+}
+
+.operation-log-date-range {
+  grid-column: span 2;
+  width: 100% !important;
+}
+
+.operator-cell,
+.request-cell {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.operator-cell strong,
+.summary-text,
+.request-cell span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-cell strong {
+  color: var(--sa-ink);
+  font-size: 0.92rem;
+}
+
+.operator-cell span,
+.request-cell span {
+  color: var(--sa-muted);
+  font-size: 0.8rem;
+}
+
+.request-cell {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.operation-log-table .el-tag .el-icon {
+  margin-right: 3px;
+}
+
+.operation-log-table .operation-log-row--fail td.el-table__cell {
+  background: #fff7f7;
+}
+
+.operation-log-drawer .el-drawer__header {
+  margin-bottom: 0;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--sa-border);
+  color: var(--sa-ink);
+  font-weight: 900;
+}
+
+.operation-log-drawer .el-drawer__body {
+  padding: 16px 20px 22px;
+}
+
+.operation-log-detail {
+  min-height: 360px;
+  display: grid;
+  gap: 14px;
+}
+
+.operation-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.operation-detail-grid div {
+  min-height: 68px;
+  padding: 12px;
+  border: 1px solid #e4eef1;
+  border-radius: 8px;
+  background: #fbfefe;
+}
+
+.operation-detail-grid dt {
+  margin-bottom: 8px;
+  color: var(--sa-muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.operation-detail-grid dd {
+  margin: 0;
+  color: var(--sa-ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.json-section {
+  min-width: 0;
+  border: 1px solid #e4eef1;
+  border-radius: 8px;
+  background: #fbfefe;
+  overflow: hidden;
+}
+
+.json-section-head {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e4eef1;
+}
+
+.json-section h3 {
+  margin: 0;
+  color: var(--sa-ink);
+  font-size: 0.94rem;
+}
+
+.json-section pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: #14313a;
+  background: #f8fcfd;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .analysis-scope-panel {
@@ -945,11 +1120,20 @@ a {
     .query-grid,
     .detail-layout,
     .analysis-summary,
+    .operation-summary,
     .analysis-grid,
     .scope-mode-grid,
     .scope-form-grid,
     .switch-grid {
     grid-template-columns: 1fr;
+  }
+
+  .operation-log-query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .operation-log-date-range {
+    grid-column: 1 / -1;
   }
 
   .focus-control-row {
@@ -1036,8 +1220,14 @@ a {
   }
 
   .detail-grid,
-  .edit-form-grid {
+  .edit-form-grid,
+  .operation-log-query-grid,
+  .operation-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .operation-log-date-range {
+    grid-column: auto;
   }
 
   .student-edit-dialog {
