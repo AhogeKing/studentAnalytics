@@ -1,6 +1,10 @@
 package com.ahogeking.studentanalytics.controller;
 
+import com.ahogeking.studentanalytics.annotation.LogOperation;
 import com.ahogeking.studentanalytics.common.Result;
+import com.ahogeking.studentanalytics.common.constant.OperationModule;
+import com.ahogeking.studentanalytics.common.constant.OperationTargetType;
+import com.ahogeking.studentanalytics.common.constant.OperationType;
 import com.ahogeking.studentanalytics.dto.LoginRequest;
 import com.ahogeking.studentanalytics.dto.LoginResponse;
 import com.ahogeking.studentanalytics.dto.MeResponse;
@@ -29,8 +33,13 @@ public class SysUserController {
     }
 
     @PostMapping("/logout")
+    @LogOperation(
+            module = OperationModule.AUTH,
+            type = OperationType.LOGOUT,
+            targetType = OperationTargetType.USER,
+            recordRequest = false
+    )
     public Result<Void> logout(@RequestHeader("Authorization") String token) {
-        SysUserContext.remove();
         return Result.success();
     }
 

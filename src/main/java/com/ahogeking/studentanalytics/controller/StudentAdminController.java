@@ -1,7 +1,11 @@
 package com.ahogeking.studentanalytics.controller;
 
+import com.ahogeking.studentanalytics.annotation.LogOperation;
 import com.ahogeking.studentanalytics.annotation.RequireRole;
 import com.ahogeking.studentanalytics.common.Result;
+import com.ahogeking.studentanalytics.common.constant.OperationModule;
+import com.ahogeking.studentanalytics.common.constant.OperationTargetType;
+import com.ahogeking.studentanalytics.common.constant.OperationType;
 import com.ahogeking.studentanalytics.dto.StudentCreateRequest;
 import com.ahogeking.studentanalytics.dto.StudentPerformanceUpsertRequest;
 import com.ahogeking.studentanalytics.service.StudentService;
@@ -24,12 +28,26 @@ public class StudentAdminController {
 
     @RequireRole({"ADMIN"})
     @PostMapping
+    @LogOperation(
+            module = OperationModule.STUDENT,
+            type = OperationType.CREATE,
+            targetType = OperationTargetType.STUDENT,
+            targetId = "#request.studentNo",
+            businessKey = "#request.studentNo"
+    )
     public Result<StudentDetailVO> createStudent(@RequestBody @Valid StudentCreateRequest request) {
         return Result.success(studentService.createStudent(request));
     }
 
     @RequireRole({"ADMIN"})
     @PutMapping("/performance/{studentNo}")
+    @LogOperation(
+            module = OperationModule.PERFORMANCE,
+            type = OperationType.UPSERT,
+            targetType = OperationTargetType.PERFORMANCE,
+            targetId = "#studentNo",
+            businessKey = "#studentNo"
+    )
     public Result<StudentDetailVO> upsertStudentPerformance(
             @PathVariable Integer studentNo,
             @RequestBody @Valid StudentPerformanceUpsertRequest request) {

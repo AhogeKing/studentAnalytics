@@ -1,7 +1,11 @@
 package com.ahogeking.studentanalytics.controller;
 
+import com.ahogeking.studentanalytics.annotation.LogOperation;
 import com.ahogeking.studentanalytics.annotation.RequireRole;
 import com.ahogeking.studentanalytics.common.Result;
+import com.ahogeking.studentanalytics.common.constant.OperationModule;
+import com.ahogeking.studentanalytics.common.constant.OperationTargetType;
+import com.ahogeking.studentanalytics.common.constant.OperationType;
 import com.ahogeking.studentanalytics.dto.UserCreateRequest;
 import com.ahogeking.studentanalytics.dto.UserPasswordResetRequest;
 import com.ahogeking.studentanalytics.dto.UserStatusUpdateRequest;
@@ -43,11 +47,25 @@ public class AdminUserController {
     }
 
     @PostMapping
+    @LogOperation(
+            module = OperationModule.USER,
+            type = OperationType.CREATE,
+            targetType = OperationTargetType.USER,
+            targetId = "#request.username",
+            businessKey = "#request.username"
+    )
     public Result<AdminUserVO> createUser(@RequestBody @Valid UserCreateRequest request) {
         return Result.success(sysUserService.createAdminUser(request));
     }
 
     @PutMapping("/{id}")
+    @LogOperation(
+            module = OperationModule.USER,
+            type = OperationType.UPDATE,
+            targetType = OperationTargetType.USER,
+            targetId = "#id",
+            businessKey = "#id"
+    )
     public Result<AdminUserVO> updateUser(
             @PathVariable Integer id,
             @RequestBody @Valid UserUpdateRequest request) {
@@ -55,6 +73,13 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/status")
+    @LogOperation(
+            module = OperationModule.USER,
+            type = OperationType.UPDATE_STATUS,
+            targetType = OperationTargetType.USER,
+            targetId = "#id",
+            businessKey = "#id"
+    )
     public Result<AdminUserVO> updateUserStatus(
             @PathVariable Integer id,
             @RequestBody @Valid UserStatusUpdateRequest request) {
@@ -62,6 +87,13 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/password")
+    @LogOperation(
+            module = OperationModule.USER,
+            type = OperationType.RESET_PASSWORD,
+            targetType = OperationTargetType.USER,
+            targetId = "#id",
+            businessKey = "#id"
+    )
     public Result<Void> resetPassword(
             @PathVariable Integer id,
             @RequestBody @Valid UserPasswordResetRequest request) {
@@ -70,6 +102,13 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/{id}")
+    @LogOperation(
+            module = OperationModule.USER,
+            type = OperationType.DISABLE,
+            targetType = OperationTargetType.USER,
+            targetId = "#id",
+            businessKey = "#id"
+    )
     public Result<Void> deleteUser(@PathVariable Integer id) {
         sysUserService.disableAdminUser(id);
         return Result.success();

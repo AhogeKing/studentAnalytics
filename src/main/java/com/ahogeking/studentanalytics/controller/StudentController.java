@@ -1,7 +1,11 @@
 package com.ahogeking.studentanalytics.controller;
 
+import com.ahogeking.studentanalytics.annotation.LogOperation;
 import com.ahogeking.studentanalytics.annotation.RequireRole;
 import com.ahogeking.studentanalytics.common.Result;
+import com.ahogeking.studentanalytics.common.constant.OperationModule;
+import com.ahogeking.studentanalytics.common.constant.OperationTargetType;
+import com.ahogeking.studentanalytics.common.constant.OperationType;
 import com.ahogeking.studentanalytics.dto.StudentOverviewQueryRequest;
 import com.ahogeking.studentanalytics.dto.StudentOverviewUpdateRequest;
 import com.ahogeking.studentanalytics.service.StudentService;
@@ -81,6 +85,13 @@ public class StudentController {
 
     @PutMapping("/overview/{studentNo}")
     @RequireRole({"ADMIN"})
+    @LogOperation(
+            module = OperationModule.STUDENT,
+            type = OperationType.UPDATE,
+            targetType = OperationTargetType.STUDENT,
+            targetId = "#studentNo",
+            businessKey = "#studentNo"
+    )
     public Result<StudentOverviewItemVO> updateStudentOverview(
             @PathVariable Integer studentNo,
             @RequestBody @Valid StudentOverviewUpdateRequest request) {
@@ -89,6 +100,13 @@ public class StudentController {
 
     @DeleteMapping("/overview/{studentNo}")
     @RequireRole({"ADMIN"})
+    @LogOperation(
+            module = OperationModule.STUDENT,
+            type = OperationType.DELETE,
+            targetType = OperationTargetType.STUDENT,
+            targetId = "#studentNo",
+            businessKey = "#studentNo"
+    )
     public Result<Void> deleteStudentOverview(@PathVariable Integer studentNo) {
         studentService.deleteStudentOverview(studentNo);
         return Result.success();

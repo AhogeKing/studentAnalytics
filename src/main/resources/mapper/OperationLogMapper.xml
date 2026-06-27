@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ahogeking.studentanalytics.mapper.OperationLogMapper">
+    <resultMap id="OperationLogResultMap" type="com.ahogeking.studentanalytics.entity.OperationLog">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="real_name" property="realName"/>
+        <result column="user_role" property="userRole"/>
+        <result column="module_name" property="moduleName"/>
+        <result column="operation_type" property="operationType"/>
+        <result column="operation_result" property="operationResult"/>
+        <result column="target_type" property="targetType"/>
+        <result column="target_id" property="targetId"/>
+        <result column="business_key" property="businessKey"/>
+        <result column="request_method" property="requestMethod"/>
+        <result column="request_uri" property="requestUri"/>
+        <result column="ip_address" property="ipAddress"/>
+        <result column="request_params" property="requestParams"/>
+        <result column="request_body" property="requestBody"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="OperationLogColumns">
+        id,
+        user_id,
+        username,
+        real_name,
+        user_role,
+        module_name,
+        operation_type,
+        operation_result,
+        target_type,
+        target_id,
+        business_key,
+        request_method,
+        request_uri,
+        ip_address,
+        request_params,
+        request_body,
+        created_at
+    </sql>
+
+    <sql id="OperationLogWhere">
+        <where>
+            <if test="query.userId != null">
+                AND user_id = #{query.userId}
+            </if>
+            <if test="query.username != null and query.username != ''">
+                AND username LIKE CONCAT('%', #{query.username}, '%')
+            </if>
+            <if test="query.userRole != null and query.userRole != ''">
+                AND user_role = #{query.userRole}
+            </if>
+            <if test="query.moduleName != null and query.moduleName != ''">
+                AND module_name = #{query.moduleName}
+            </if>
+            <if test="query.operationType != null and query.operationType != ''">
+                AND operation_type = #{query.operationType}
+            </if>
+            <if test="query.operationResult != null and query.operationResult != ''">
+                AND operation_result = #{query.operationResult}
+            </if>
+            <if test="query.targetType != null and query.targetType != ''">
+                AND target_type = #{query.targetType}
+            </if>
+            <if test="query.targetId != null and query.targetId != ''">
+                AND target_id = #{query.targetId}
+            </if>
+            <if test="query.businessKey != null and query.businessKey != ''">
+                AND business_key LIKE CONCAT('%', #{query.businessKey}, '%')
+            </if>
+            <if test="query.startTime != null">
+                AND created_at &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND created_at &lt;= #{query.endTime}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (
+                    username LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR real_name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR request_uri LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR business_key LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR target_id LIKE CONCAT('%', #{query.keyword}, '%')
+                )
+            </if>
+        </where>
+    </sql>
+
+    <insert id="insert"
+            parameterType="com.ahogeking.studentanalytics.entity.OperationLog"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO operation_log (
+            user_id,
+            username,
+            real_name,
+            user_role,
+            module_name,
+            operation_type,
+            operation_result,
+            target_type,
+            target_id,
+            business_key,
+            request_method,
+            request_uri,
+            ip_address,
+            request_params,
+            request_body
+        )
+        VALUES (
+            #{userId},
+            #{username},
+            #{realName},
+            #{userRole},
+            #{moduleName},
+            #{operationType},
+            #{operationResult},
+            #{targetType},
+            #{targetId},
+            #{businessKey},
+            #{requestMethod},
+            #{requestUri},
+            #{ipAddress},
+            #{requestParams},
+            #{requestBody}
+        )
+    </insert>
+
+    <select id="countOperationLogs" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM operation_log
+        <include refid="OperationLogWhere"/>
+    </select>
+
+    <select id="selectOperationLogPage" resultMap="OperationLogResultMap">
+        SELECT
+        <include refid="OperationLogColumns"/>
+        FROM operation_log
+        <include refid="OperationLogWhere"/>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="selectOperationLogById" resultMap="OperationLogResultMap">
+        SELECT
+        <include refid="OperationLogColumns"/>
+        FROM operation_log
+        WHERE id = #{id}
+    </select>
+</mapper>
