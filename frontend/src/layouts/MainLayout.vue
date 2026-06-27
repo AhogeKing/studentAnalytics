@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { DataAnalysis, SwitchButton, UserFilled } from "@element-plus/icons-vue";
@@ -8,6 +8,7 @@ import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const canManageUsers = computed(() => authStore.role.toLowerCase() === "admin");
 
 async function handleLogout() {
   try {
@@ -48,6 +49,7 @@ onMounted(async () => {
       <nav class="app-nav" aria-label="主导航">
         <RouterLink :to="{ name: 'students' }">学生概览</RouterLink>
         <RouterLink :to="{ name: 'analytics' }">分析图表</RouterLink>
+        <RouterLink v-if="canManageUsers" :to="{ name: 'admin-users' }">用户管理</RouterLink>
       </nav>
 
       <div class="topbar-account">

@@ -2,7 +2,9 @@ import { apiClient, unwrap } from "./client";
 import type { AxiosRequestConfig } from "axios";
 import type {
   StudentDetail,
+  StudentCreatePayload,
   StudentFilterOptions,
+  StudentPerformanceUpsertPayload,
   StudentOverview,
   StudentOverviewItem,
   StudentOverviewQuery,
@@ -23,8 +25,16 @@ export function fetchStudentDetail(studentNo: number) {
   return unwrap<StudentDetail>(apiClient.get(`/students/detail/${studentNo}`));
 }
 
+export function createStudent(payload: StudentCreatePayload) {
+  return unwrap<StudentDetail>(apiClient.post("/students", payload));
+}
+
 export function updateStudentOverview(studentNo: number, payload: StudentOverviewUpdatePayload) {
   return unwrap<StudentOverviewItem>(apiClient.put(`/students/overview/${studentNo}`, payload));
+}
+
+export function upsertStudentPerformance(studentNo: number, payload: StudentPerformanceUpsertPayload) {
+  return unwrap<StudentDetail>(apiClient.put(`/students/performance/${studentNo}`, payload));
 }
 
 export function deleteStudentOverview(studentNo: number) {

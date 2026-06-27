@@ -12,6 +12,7 @@ import AcademicPerformanceCard from "../components/student/AcademicPerformanceCa
 import ActivityProfileCard from "../components/student/ActivityProfileCard.vue";
 import BasicInfoCard from "../components/student/BasicInfoCard.vue";
 import StudentEditDialog from "../components/student/StudentEditDialog.vue";
+import StudentPerformanceDialog from "../components/student/StudentPerformanceDialog.vue";
 import SupportStatusCard from "../components/student/SupportStatusCard.vue";
 import { useAuthStore } from "../stores/auth";
 import type { StudentDetail, StudentEditableItem, StudentFilterOptions } from "../types";
@@ -26,6 +27,7 @@ const loading = ref(false);
 const detail = ref<StudentDetail | null>(null);
 const filterOptions = ref<StudentFilterOptions | null>(null);
 const editVisible = ref(false);
+const performanceVisible = ref(false);
 
 const canEdit = computed(() => authStore.role.toLowerCase() === "admin");
 const editableStudent = computed<StudentEditableItem | null>(() => {
@@ -46,13 +48,19 @@ async function loadDetail() {
   loading.value = true;
   try {
     detail.value = await fetchStudentDetail(props.studentNo);
+  } catch {
+    detail.value = null;
   } finally {
     loading.value = false;
   }
 }
 
 async function loadOptions() {
-  filterOptions.value = await fetchStudentFilterOptions();
+  try {
+    filterOptions.value = await fetchStudentFilterOptions();
+  } catch {
+    filterOptions.value = null;
+  }
 }
 
 async function handleDelete() {
@@ -69,6 +77,10 @@ async function handleDelete() {
   await deleteStudentOverview(student.student_no);
   ElMessage.success("学生记录已删除");
   await router.replace({ name: "students" });
+}
+
+function handlePerformanceSaved(updated: StudentDetail) {
+  detail.value = updated;
 }
 
 onMounted(async () => {
@@ -101,6 +113,10 @@ watch(
         <el-icon><EditPen /></el-icon>
         编辑
       </el-button>
+      <el-button v-if="canEdit" type="primary" plain :disabled="!detail" @click="performanceVisible = true">
+        <el-icon><EditPen /></el-icon>
+        {{ detail?.performance_available ? "编辑表现" : "补充表现" }}
+      </el-button>
       <el-button v-if="canEdit" type="danger" :disabled="!detail" @click="handleDelete">
         <el-icon><Delete /></el-icon>
         删除
@@ -112,7 +128,7 @@ watch(
     v-if="detail && !detail.performance_available"
     class="inline-alert"
     type="warning"
-    title="该学生暂未有关联学业表现记录，详情页只展示基础信息。"
+    title="该学生暂未有关联学业表现记录，管理员可通过补充表现录入。"
     show-icon
     :closable="false"
   />
@@ -133,5 +149,11 @@ watch(
     :filter-options="filterOptions"
     :performance-available="Boolean(detail?.performance_available)"
     @saved="loadDetail"
+  />
+
+  <StudentPerformanceDialog
+    v-model="performanceVisible"
+    :detail="detail"
+    @saved="handlePerformanceSaved"
   />
 </template>

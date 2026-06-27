@@ -34,12 +34,12 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message || "网络请求失败";
     const silent = (error.config as SilentRequestConfig | undefined)?.silent;
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       useAuthStore().clear();
       void router.replace({ name: "login" });
     }
     if (!silent) {
-      ElMessage.error(message);
+      ElMessage.error(status === 403 ? message || "无权限执行此操作" : message);
     }
     return Promise.reject(error);
   }

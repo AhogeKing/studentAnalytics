@@ -117,7 +117,7 @@ async function handleRegister() {
       <div>
         <p class="eyebrow">StudentAnalytics</p>
         <h1>学生学业信息管理系统</h1>
-        <p class="login-lead">当前版本只启用后端已完成的学生概览、详情、编辑与删除能力。</p>
+        <p class="login-lead">当前版本启用学生概览、详情、分析图表与管理员维护能力。</p>
       </div>
     </section>
 

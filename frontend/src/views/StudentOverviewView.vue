@@ -3,12 +3,13 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { Sort } from "element-plus";
-import { ArrowLeft, ArrowRight, EditPen, Refresh, VideoPause, VideoPlay } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, EditPen, Plus, Refresh, VideoPause, VideoPlay } from "@element-plus/icons-vue";
 import {
   deleteStudentOverview,
   fetchStudentFilterOptions,
   fetchStudentOverview
 } from "../api/students";
+import StudentCreateDialog from "../components/student/StudentCreateDialog.vue";
 import StudentEditDialog from "../components/student/StudentEditDialog.vue";
 import StudentQueryBar from "../components/student/StudentQueryBar.vue";
 import StudentTable from "../components/student/StudentTable.vue";
@@ -16,6 +17,7 @@ import { useAuthStore } from "../stores/auth";
 import type {
   ClassInfo,
   StudentEditableItem,
+  StudentDetail,
   StudentFilterForm,
   StudentFilterOptions,
   StudentOverview,
@@ -37,6 +39,7 @@ const sortField = ref<string>();
 const sortOrder = ref<string>();
 const editingStudent = ref<StudentEditableItem | null>(null);
 const editVisible = ref(false);
+const createVisible = ref(false);
 const carouselPlaying = ref(false);
 let carouselTimer: ReturnType<typeof window.setInterval> | undefined;
 
@@ -92,6 +95,8 @@ async function loadFilterOptions() {
   filterLoading.value = true;
   try {
     filterOptions.value = await fetchStudentFilterOptions();
+  } catch {
+    filterOptions.value = null;
   } finally {
     filterLoading.value = false;
   }
@@ -114,6 +119,8 @@ async function loadOverview() {
           });
     overview.value = await fetchStudentOverview(query);
     page.value = 1;
+  } catch {
+    overview.value = null;
   } finally {
     loading.value = false;
   }
@@ -215,6 +222,13 @@ async function handleSaved() {
   await loadOverview();
 }
 
+async function handleCreated(detail: StudentDetail) {
+  await loadOverview();
+  if (detail.basic_info?.student_no) {
+    await router.push({ name: "student-detail", params: { studentNo: detail.basic_info.student_no } });
+  }
+}
+
 onMounted(async () => {
   await loadFilterOptions();
   await loadOverview();
@@ -230,7 +244,7 @@ onBeforeUnmount(() => {
     <div>
       <p class="eyebrow">学生概览</p>
       <h1>{{ queryMode === "filter" ? currentClassName : "学生搜索结果" }}</h1>
-      <p>当前前端只启用学生查询、详情、编辑与删除；默认进入高一 1 班。</p>
+      <p>默认进入高一 1 班；教师可查看，管理员可新增、编辑与删除学生。</p>
     </div>
     <div class="head-actions">
       <el-button :disabled="loading" @click="goToClass(-1)">
@@ -244,6 +258,10 @@ onBeforeUnmount(() => {
       <el-button :type="carouselPlaying ? 'warning' : 'primary'" :disabled="loading" @click="toggleCarousel">
         <el-icon><component :is="carouselPlaying ? VideoPause : VideoPlay" /></el-icon>
         {{ carouselPlaying ? "暂停轮播" : "班级轮播" }}
+      </el-button>
+      <el-button v-if="canEdit" type="primary" :disabled="filterLoading" @click="createVisible = true">
+        <el-icon><Plus /></el-icon>
+        新增学生
       </el-button>
     </div>
   </section>
@@ -321,5 +339,11 @@ onBeforeUnmount(() => {
     :filter-options="filterOptions"
     :performance-available="true"
     @saved="handleSaved"
+  />
+
+  <StudentCreateDialog
+    v-model="createVisible"
+    :filter-options="filterOptions"
+    @saved="handleCreated"
   />
 </template>

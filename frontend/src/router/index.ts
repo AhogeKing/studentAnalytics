@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { getToken } from "../stores/auth";
+import { getStoredUser, getToken } from "../stores/auth";
+import AdminUsersView from "../views/AdminUsersView.vue";
 import MainLayout from "../layouts/MainLayout.vue";
 import AnalysisChartsView from "../views/AnalysisChartsView.vue";
 import LoginView from "../views/LoginView.vue";
@@ -38,6 +39,12 @@ const router = createRouter({
           component: AnalysisChartsView
         },
         {
+          path: "admin/users",
+          name: "admin-users",
+          component: AdminUsersView,
+          meta: { requiresAdmin: true }
+        },
+        {
           path: "students/:studentNo",
           name: "student-detail",
           component: StudentDetailView,
@@ -57,6 +64,12 @@ router.beforeEach((to) => {
   const hasToken = Boolean(getToken());
   if (!to.meta.public && !hasToken) {
     return { name: "login" };
+  }
+  if (to.meta.requiresAdmin) {
+    const role = getStoredUser()?.role?.toLowerCase();
+    if (role && role !== "admin") {
+      return { name: "students" };
+    }
   }
   if (to.name === "login" && hasToken) {
     return { name: "students" };

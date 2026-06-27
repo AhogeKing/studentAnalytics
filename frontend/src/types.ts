@@ -26,6 +26,43 @@ export interface UserProfile {
   role?: string;
 }
 
+export interface PageResult<T> {
+  total: number;
+  records: T[];
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  real_name?: string | null;
+  realName?: string | null;
+  role: "ADMIN" | "TEACHER" | string;
+  status: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AdminUserCreatePayload {
+  username: string;
+  password: string;
+  real_name?: string;
+  role: "ADMIN" | "TEACHER";
+}
+
+export interface AdminUserUpdatePayload {
+  real_name?: string;
+  role?: "ADMIN" | "TEACHER";
+  status?: number;
+}
+
+export interface AdminUserStatusPayload {
+  status: number;
+}
+
+export interface AdminUserPasswordPayload {
+  new_password: string;
+}
+
 export interface OptionVO<T> {
   value: T | null;
   label: string;
@@ -92,6 +129,28 @@ export interface StudentOverviewUpdatePayload {
   gender?: number;
   class_name?: string;
   gpa?: number;
+}
+
+export interface StudentCreatePayload {
+  student_no: number;
+  name?: string;
+  age: number;
+  gender: number;
+  ethnicity: number;
+  parental_education: number;
+  class_name: string;
+}
+
+export interface StudentPerformanceUpsertPayload {
+  study_time_weekly: number;
+  absences: number;
+  tutoring: boolean;
+  parental_support: number;
+  extracurricular: boolean;
+  sports: boolean;
+  music: boolean;
+  volunteering: boolean;
+  gpa: number;
 }
 
 export interface StudentEditableItem {
