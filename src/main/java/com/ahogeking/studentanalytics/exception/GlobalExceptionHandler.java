@@ -18,6 +18,11 @@ public class GlobalExceptionHandler {
         return Result.error(401, ex.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public Result<Void> handleForbiddenException(ForbiddenException ex) {
+        return Result.error(403, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<Void> handleValidationException(MethodArgumentNotValidException ex) {
         FieldError fieldError = ex.getBindingResult().getFieldError();

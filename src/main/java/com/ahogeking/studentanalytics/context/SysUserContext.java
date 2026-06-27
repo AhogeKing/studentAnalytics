@@ -1,48 +1,48 @@
 package com.ahogeking.studentanalytics.context;
 
-import io.jsonwebtoken.Claims;
+import com.ahogeking.studentanalytics.entity.SysUser;
 
 public final class SysUserContext {
     private SysUserContext() {
     }
 
-    private static final ThreadLocal<Claims> HOLDER = new ThreadLocal<>();
+    private static final ThreadLocal<SysUser> HOLDER = new ThreadLocal<>();
 
-    public static void set(Claims claims) {
-        HOLDER.set(claims);
+    public static void set(SysUser user) {
+        HOLDER.set(user);
     }
 
-    public static Claims get() {
+    public static SysUser get() {
         return HOLDER.get();
     }
 
     public static Integer getUserId() {
-        Claims claims = get();
-        if (claims == null) {
+        SysUser user = get();
+        if (user == null) {
             return null;
         }
-        return Integer.valueOf(claims.getSubject());
+        return user.getId();
     }
 
     public static String getUsername() {
-        Claims claims = get();
-        return claims == null
+        SysUser user = get();
+        return user == null
                 ? null
-                : claims.get("username", String.class);
+                : user.getUsername();
     }
 
     public static String getRealName() {
-        Claims claims = get();
-        return claims == null
+        SysUser user = get();
+        return user == null
                 ? null
-                : claims.get("realName", String.class);
+                : user.getRealName();
     }
 
     public static String getRole() {
-        Claims claims = get();
-        return claims == null
+        SysUser user = get();
+        return user == null
                 ? null
-                : claims.get("role", String.class);
+                : user.getRole();
     }
 
     public static boolean isAdmin() {

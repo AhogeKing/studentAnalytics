@@ -1,5 +1,6 @@
 package com.ahogeking.studentanalytics.controller;
 
+import com.ahogeking.studentanalytics.annotation.RequireRole;
 import com.ahogeking.studentanalytics.common.Result;
 import com.ahogeking.studentanalytics.dto.StudentOverviewQueryRequest;
 import com.ahogeking.studentanalytics.dto.StudentOverviewUpdateRequest;
@@ -79,6 +80,7 @@ public class StudentController {
     }
 
     @PutMapping("/overview/{studentNo}")
+    @RequireRole({"ADMIN"})
     public Result<StudentOverviewItemVO> updateStudentOverview(
             @PathVariable Integer studentNo,
             @RequestBody @Valid StudentOverviewUpdateRequest request) {
@@ -86,6 +88,7 @@ public class StudentController {
     }
 
     @DeleteMapping("/overview/{studentNo}")
+    @RequireRole({"ADMIN"})
     public Result<Void> deleteStudentOverview(@PathVariable Integer studentNo) {
         studentService.deleteStudentOverview(studentNo);
         return Result.success();

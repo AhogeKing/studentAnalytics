@@ -27,4 +27,10 @@ public class SysUser {
     private String role = "TEACHER";
 
     private Integer status;
+
+    @JsonIgnore
+    private LocalDateTime createdAt;
+
+    @JsonIgnore
+    private LocalDateTime updatedAt;
 }

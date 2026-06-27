@@ -1,14 +1,20 @@
 package com.ahogeking.studentanalytics.service.impl;
 
+import com.ahogeking.studentanalytics.dto.StudentCreateRequest;
 import com.ahogeking.studentanalytics.dto.StudentOverviewQueryRequest;
 import com.ahogeking.studentanalytics.dto.StudentOverviewUpdateRequest;
+import com.ahogeking.studentanalytics.dto.StudentPerformanceUpsertRequest;
+import com.ahogeking.studentanalytics.entity.Performance;
+import com.ahogeking.studentanalytics.entity.Student;
 import com.ahogeking.studentanalytics.dto.row.StudentDetailAggregateRow;
 import com.ahogeking.studentanalytics.dto.row.StudentOverviewRow;
 import com.ahogeking.studentanalytics.dto.StudentSortOption;
 import com.ahogeking.studentanalytics.exception.BusinessException;
+import com.ahogeking.studentanalytics.mapper.PerformanceMapper;
 import com.ahogeking.studentanalytics.mapper.StudentMapper;
 import com.ahogeking.studentanalytics.service.StudentService;
 import com.ahogeking.studentanalytics.vo.*;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +33,7 @@ public class StudentServiceImpl implements StudentService {
     private static final String DEFAULT_SORT_ORDER = "ASC";
 
     private final StudentMapper studentMapper;
+    private final PerformanceMapper performanceMapper;
 
     // 查询所有学生概览
     @Override
@@ -93,6 +100,38 @@ public class StudentServiceImpl implements StudentService {
         return vo;
     }
 
+    // 新增学生基础信息，不创建默认表现记录
+    @Override
+    @Transactional
+    public StudentDetailVO createStudent(StudentCreateRequest request) {
+        if (request == null) {
+            throw new BusinessException("学生信息不能为空");
+        }
+
+        String normalizedClassName = normalizeClassNameForUpdate(request.getClassName());
+        Integer gradeLevel = parseGradeLevel(normalizedClassName);
+
+        Long exists = studentMapper.selectCount(new LambdaQueryWrapper<Student>()
+                .eq(Student::getStudentNo, request.getStudentNo()));
+        if (exists != null && exists > 0) {
+            throw new BusinessException("学生编号已存在");
+        }
+
+        Student student = new Student();
+        student.setStudentNo(request.getStudentNo());
+        student.setName(normalizeNameForCreate(request.getName(), request.getStudentNo()));
+        student.setAge(request.getAge());
+        student.setGradeLevel(gradeLevel);
+        student.setClassName(normalizedClassName);
+        student.setGender(request.getGender());
+        student.setEthnicity(request.getEthnicity());
+        student.setParentalEducation(request.getParentalEducation());
+        student.setDeleted(0);
+        studentMapper.insert(student);
+
+        return selectStudentDetail(request.getStudentNo());
+    }
+
     // 修改学生表及表现表中的概览字段
     @Override
     @Transactional
@@ -150,6 +189,50 @@ public class StudentServiceImpl implements StudentService {
         }
 
         return toStudentOverviewItemVO(studentMapper.selectStudentOverviewRowByStudentNo(studentNo));
+    }
+
+    // 新增或更新学生学业表现
+    @Override
+    @Transactional
+    public StudentDetailVO upsertStudentPerformance(Integer studentNo, StudentPerformanceUpsertRequest request) {
+        if (studentNo == null) {
+            throw new BusinessException("学生编号不能为空");
+        }
+        if (request == null) {
+            throw new BusinessException("学业表现不能为空");
+        }
+        if (request.getGradeClass() != null) {
+            throw new BusinessException("成绩等级由GPA自动计算，不能手动提交");
+        }
+
+        Student student = studentMapper.selectOne(new LambdaQueryWrapper<Student>()
+                .eq(Student::getStudentNo, studentNo)
+                .eq(Student::getDeleted, 0)
+                .last("LIMIT 1"));
+        if (student == null) {
+            throw new BusinessException("学生不存在或已删除");
+        }
+
+        Performance performance = performanceMapper.selectOne(new LambdaQueryWrapper<Performance>()
+                .eq(Performance::getStudentId, student.getId())
+                .last("LIMIT 1"));
+
+        if (performance == null) {
+            performance = new Performance();
+            performance.setStudentId(student.getId());
+            fillPerformance(performance, request);
+            performance.setDataSource("MANUAL");
+            performance.setDataQualityStatus(0);
+            performanceMapper.insert(performance);
+        } else {
+            fillPerformance(performance, request);
+            performance.setDataSource("MANUAL");
+            performance.setDataQualityStatus(0);
+            performance.setQualityIssue(null);
+            performanceMapper.updateById(performance);
+        }
+
+        return selectStudentDetail(studentNo);
     }
 
     // 软删除学生
@@ -361,6 +444,13 @@ public class StudentServiceImpl implements StudentService {
         return trimmed;
     }
 
+    private String normalizeNameForCreate(String name, Integer studentNo) {
+        if (name == null || name.isBlank()) {
+            return "Student " + studentNo;
+        }
+        return normalizeName(name);
+    }
+
     private void validateOverviewUpdateRequest(StudentOverviewUpdateRequest request) {
         if (request.getGradeLevel() != null && request.getClassName() == null) {
             throw new BusinessException("年级不能单独修改，请同时提交班级或只提交班级由后端推导年级");
@@ -384,6 +474,23 @@ public class StudentServiceImpl implements StudentService {
             return 3;
         }
         return 4;
+    }
+
+    private void fillPerformance(Performance performance, StudentPerformanceUpsertRequest request) {
+        performance.setStudyTimeWeekly(request.getStudyTimeWeekly());
+        performance.setAbsences(request.getAbsences());
+        performance.setTutoring(toTinyInt(request.getTutoring()));
+        performance.setParentalSupport(request.getParentalSupport());
+        performance.setExtracurricular(toTinyInt(request.getExtracurricular()));
+        performance.setSports(toTinyInt(request.getSports()));
+        performance.setMusic(toTinyInt(request.getMusic()));
+        performance.setVolunteering(toTinyInt(request.getVolunteering()));
+        performance.setGpa(request.getGpa());
+        performance.setGradeClass(calculateGradeClass(request.getGpa()));
+    }
+
+    private Integer toTinyInt(Boolean value) {
+        return Boolean.TRUE.equals(value) ? 1 : 0;
     }
 
     // 判断请求中有没有任何一个可更新字段
