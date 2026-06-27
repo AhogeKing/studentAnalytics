@@ -112,23 +112,23 @@ CREATE TABLE student
 -- 4. 学生学习表现表
 CREATE TABLE student_performance
 (
-    id                INT                    NOT NULL AUTO_INCREMENT,
-    student_id        INT                    NOT NULL COMMENT 'FK to student.id',
-    study_time_weekly DECIMAL(7, 4)          NOT NULL COMMENT 'Weekly study',
-    absences          INT                    NOT NULL COMMENT 'Absence count, dataset range 0-29 / 30',
-    tutoring          TINYINT                NOT NULL COMMENT '0 no, 1 yes',
-    parental_support  TINYINT                NOT NULL COMMENT '0-4, see dict_type = parental_support',
-    extracurricular   TINYINT                NOT NULL COMMENT '0 no, 1 yes',
-    sports            TINYINT                NOT NULL COMMENT '0 no, 1',
-    music             TINYINT                NOT NULL COMMENT '0 no, 1',
-    volunteering      TINYINT                NOT NULL COMMENT '0 no, 1 yes',
-    gpa               DECIMAL(5, 4)          NOT NULL COMMENT 'GPA, dataset range 0-4',
-    grade_class       TINYINT                NOT NULL COMMENT '0 A, 1 B, 2 C, 3 D, 4 F',
-    data_source       ENUM ('CSV', 'MANUAL') NOT NULL DEFAULT 'CSV' COMMENT 'Record source',
-    data_quality_status TINYINT              NOT NULL DEFAULT 0 COMMENT '0 NORMAL, 1 WARNING, 2 INVALID',
-    quality_issue     VARCHAR(255)           NULL COMMENT '数据质量原因',
-    created_at        DATETIME               NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at        DATETIME               NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id                  INT                    NOT NULL AUTO_INCREMENT,
+    student_id          INT                    NOT NULL COMMENT 'FK to student.id',
+    study_time_weekly   DECIMAL(7, 4)          NOT NULL COMMENT 'Weekly study',
+    absences            INT                    NOT NULL COMMENT 'Absence count, dataset range 0-29 / 30',
+    tutoring            TINYINT                NOT NULL COMMENT '0 no, 1 yes',
+    parental_support    TINYINT                NOT NULL COMMENT '0-4, see dict_type = parental_support',
+    extracurricular     TINYINT                NOT NULL COMMENT '0 no, 1 yes',
+    sports              TINYINT                NOT NULL COMMENT '0 no, 1',
+    music               TINYINT                NOT NULL COMMENT '0 no, 1',
+    volunteering        TINYINT                NOT NULL COMMENT '0 no, 1 yes',
+    gpa                 DECIMAL(5, 4)          NOT NULL COMMENT 'GPA, dataset range 0-4',
+    grade_class         TINYINT                NOT NULL COMMENT '0 A, 1 B, 2 C, 3 D, 4 F',
+    data_source         ENUM ('CSV', 'MANUAL') NOT NULL DEFAULT 'CSV' COMMENT 'Record source',
+    data_quality_status TINYINT                NOT NULL DEFAULT 0 COMMENT '0 NORMAL, 1 WARNING, 2 INVALID',
+    quality_issue       VARCHAR(255)           NULL COMMENT '数据质量原因',
+    created_at          DATETIME               NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME               NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_performance_student_id (student_id),
     KEY idx_perf_grade_class (grade_class),
@@ -253,24 +253,75 @@ CREATE TABLE import_batch
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='CSV import batch table';
 
+# 重新定义 operation_Log 表
+DROP TABLE IF EXISTS operation_log;
+
 CREATE TABLE operation_log
 (
-    id             INT          NOT NULL AUTO_INCREMENT,
-    user_id        INT          NULL,
-    module_name    VARCHAR(50)  NOT NULL COMMENT 'student/performance/model/warning/etc.',
-    operation_type VARCHAR(50)  NOT NULL COMMENT 'CREATE/UPDATE/DELETE/IMPORT/TRAIN/PREDICT',
-    description    VARCHAR(255) NULL,
-    request_method VARCHAR(10)  NULL,
-    request_uri    VARCHAR(255) NULL,
-    ip_address     VARCHAR(64)  NULL,
-    created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id               INT          NOT NULL AUTO_INCREMENT COMMENT 'PK',
+
+    user_id          INT          NULL COMMENT '操作者用户ID，登录失败或系统操作时可为空',
+    username         VARCHAR(50)  NULL COMMENT '操作者用户名快照',
+    real_name        VARCHAR(50)  NULL COMMENT '操作者真实姓名快照',
+    user_role        VARCHAR(20)  NULL COMMENT '操作者角色快照：ADMIN / TEACHER / STUDENT',
+
+    module_name      VARCHAR(50)  NOT NULL COMMENT '模块名：auth/user/student/performance/model/prediction/warning',
+    operation_type   VARCHAR(50)  NOT NULL COMMENT '操作类型：CREATE/UPDATE/DELETE/UPSERT/TRAIN/PREDICT/LOGIN/LOGOUT 等',
+    operation_result VARCHAR(20)  NOT NULL COMMENT '操作结果：SUCCESS / FAIL',
+
+    target_type      VARCHAR(50)  NULL COMMENT '操作对象类型：USER/STUDENT/PERFORMANCE/MODEL_VERSION/PREDICTION/WARNING',
+    target_id        VARCHAR(50)  NULL COMMENT '操作对象标识：用户ID、学生学号、模型版本ID等',
+    business_key     VARCHAR(100) NULL COMMENT '业务标识：username、student_no、model_version_no等',
+
+    request_method   VARCHAR(10)  NULL COMMENT '请求方法：GET/POST/PUT/PATCH/DELETE',
+    request_uri      VARCHAR(255) NULL COMMENT '请求路径',
+    ip_address       VARCHAR(64)  NULL COMMENT '客户端IP',
+
+    request_params   JSON         NULL COMMENT 'URL查询参数JSON，需脱敏',
+    request_body     JSON         NULL COMMENT '请求体JSON，需脱敏',
+
+    created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+
     PRIMARY KEY (id),
-    KEY idx_log_user_id (user_id),
-    KEY idx_log_module_type (module_name, operation_type),
-    CONSTRAINT fk_log_user FOREIGN KEY (user_id) REFERENCES sys_user (id) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci COMMENT ='System operation log table';
+
+    CONSTRAINT fk_operation_log_user
+        FOREIGN KEY (user_id) REFERENCES sys_user (id)
+            ON UPDATE CASCADE
+            ON DELETE SET NULL,
+
+    CONSTRAINT chk_operation_log_result
+        CHECK (operation_result IN ('SUCCESS', 'FAIL')),
+
+    CONSTRAINT chk_operation_log_role
+        CHECK (
+            user_role IS NULL
+                OR user_role IN ('ADMIN', 'TEACHER', 'STUDENT')
+            )
+) COMMENT = '操作日志表';
+
+CREATE INDEX idx_operation_log_user_id
+    ON operation_log (user_id);
+
+CREATE INDEX idx_operation_log_username
+    ON operation_log (username);
+
+CREATE INDEX idx_operation_log_role
+    ON operation_log (user_role);
+
+CREATE INDEX idx_operation_log_module_type
+    ON operation_log (module_name, operation_type);
+
+CREATE INDEX idx_operation_log_result
+    ON operation_log (operation_result);
+
+CREATE INDEX idx_operation_log_target
+    ON operation_log (target_type, target_id);
+
+CREATE INDEX idx_operation_log_business_key
+    ON operation_log (business_key);
+
+CREATE INDEX idx_operation_log_created_at
+    ON operation_log (created_at);
 
 -- 10. View for model training/export: combines the two core business tables into the original CSV-like structure.
 CREATE OR REPLACE VIEW v_student_model_dataset AS
