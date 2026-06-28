@@ -11,6 +11,7 @@ import {
 import AcademicPerformanceCard from "../components/student/AcademicPerformanceCard.vue";
 import ActivityProfileCard from "../components/student/ActivityProfileCard.vue";
 import BasicInfoCard from "../components/student/BasicInfoCard.vue";
+import StudentPredictionCard from "../components/prediction/StudentPredictionCard.vue";
 import StudentEditDialog from "../components/student/StudentEditDialog.vue";
 import StudentPerformanceDialog from "../components/student/StudentPerformanceDialog.vue";
 import SupportStatusCard from "../components/student/SupportStatusCard.vue";
@@ -141,6 +142,10 @@ watch(
     />
     <SupportStatusCard :status="detail?.support_status" :available="Boolean(detail?.performance_available)" />
     <ActivityProfileCard :profile="detail?.activity_profile" :available="Boolean(detail?.performance_available)" />
+    <StudentPredictionCard
+      :student-no="detail?.basic_info?.student_no"
+      :performance-available="Boolean(detail?.performance_available)"
+    />
   </div>
 
   <StudentEditDialog

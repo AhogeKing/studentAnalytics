@@ -23,3 +23,16 @@ mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+ml:
+  python-path: ${ML_PYTHON_PATH:python/venv/bin/python}
+  project-root: .
+  script-dir: python/ml
+  train-script-name: train_decision.py
+  predict-script-name: predict_descision.py
+  dataset-path: dataset/Student_performance_data_.csv
+  artifact-dir: python/ml/artifacts
+  model-root-dir: runtime/ml/models
+  prediction-temp-dir: runtime/ml/predictions
+  train-timeout-seconds: 600
+  predict-timeout-seconds: 60

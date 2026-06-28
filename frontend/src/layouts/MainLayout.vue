@@ -8,7 +8,7 @@ import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
-const canManageUsers = computed(() => authStore.role.toLowerCase() === "admin");
+const isAdmin = computed(() => authStore.role.toLowerCase() === "admin");
 
 async function handleLogout() {
   try {
@@ -49,8 +49,10 @@ onMounted(async () => {
       <nav class="app-nav" aria-label="主导航">
         <RouterLink :to="{ name: 'students' }">学生概览</RouterLink>
         <RouterLink :to="{ name: 'analytics' }">分析图表</RouterLink>
-        <RouterLink v-if="canManageUsers" :to="{ name: 'admin-users' }">用户管理</RouterLink>
-        <RouterLink v-if="canManageUsers" :to="{ name: 'operation-logs' }">
+        <RouterLink :to="{ name: 'models' }">模型管理</RouterLink>
+        <RouterLink :to="{ name: 'warnings' }">风险预警</RouterLink>
+        <RouterLink v-if="isAdmin" :to="{ name: 'admin-users' }">用户管理</RouterLink>
+        <RouterLink v-if="isAdmin" :to="{ name: 'operation-logs' }">
           <el-icon><DocumentChecked /></el-icon>
           操作日志
         </RouterLink>

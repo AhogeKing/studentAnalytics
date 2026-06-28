@@ -357,3 +357,188 @@ export interface AnalysisScopeParams {
 export type AnalysisScopeMode = "all" | "grade" | "classes";
 export type AnalysisColorMode = "gradeClass" | "gpaBucket";
 export type AnalysisDisplayMode = "dim" | "only";
+
+export type ModelTrainMode = "quick" | "default" | "exhaustive";
+
+export interface ModelTrainPayload {
+  mode?: ModelTrainMode;
+  activate?: boolean;
+}
+
+export interface ModelVersionQuery {
+  page_num?: number;
+  page_size?: number;
+  active?: boolean;
+  start_time?: string;
+  end_time?: string;
+}
+
+export interface ModelVersion {
+  id?: number;
+  modelVersionId?: number;
+  model_version_id?: number;
+  modelName?: string | null;
+  model_name?: string | null;
+  versionNo?: string | null;
+  version_no?: string | null;
+  algorithm?: string | null;
+  accuracy?: number | string | null;
+  precisionMacro?: number | string | null;
+  precision_macro?: number | string | null;
+  recallMacro?: number | string | null;
+  recall_macro?: number | string | null;
+  f1Macro?: number | string | null;
+  f1_macro?: number | string | null;
+  active?: boolean | null;
+  is_active?: boolean | null;
+  trainedAt?: string | null;
+  trained_at?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+}
+
+export interface ModelTrainResult extends ModelVersion {
+  modelVersionId?: number;
+  targetColumn?: string | null;
+  target_column?: string | null;
+  featureColumns?: unknown;
+  feature_columns?: unknown;
+  searchMode?: string | null;
+  search_mode?: string | null;
+  searchCandidates?: number | null;
+  search_candidates?: number | null;
+  trainRows?: number | null;
+  train_rows?: number | null;
+  testRows?: number | null;
+  test_rows?: number | null;
+  bestParameters?: unknown;
+  best_parameters?: unknown;
+  aucOvrMacro?: number | string | null;
+  auc_ovr_macro?: number | string | null;
+  confusionMatrix?: unknown;
+  confusion_matrix?: unknown;
+  modelPath?: string | null;
+  model_path?: string | null;
+}
+
+export interface ModelVersionDetail extends ModelTrainResult {
+  criterion?: string | null;
+  maxDepth?: number | null;
+  max_depth?: number | null;
+  minSamplesLeaf?: number | null;
+  min_samples_leaf?: number | null;
+  metrics?: unknown;
+}
+
+export interface PredictionPayload {
+  model_version_id?: number;
+  modelVersionId?: number;
+  generate_warning?: boolean;
+  generateWarning?: boolean;
+}
+
+export interface PredictionProbability {
+  gradeClass?: OptionVO<number>;
+  grade_class?: OptionVO<number>;
+  gradeLabel?: string | null;
+  grade_label?: string | null;
+  probability: number | string;
+}
+
+export interface ImportantFactor {
+  feature?: string | null;
+  label?: string | null;
+  value?: unknown;
+  importance?: number | string | null;
+}
+
+export interface PredictionResult {
+  predictionResultId?: number;
+  prediction_result_id?: number;
+  modelVersionId?: number;
+  model_version_id?: number;
+  modelVersionNo?: string | null;
+  model_version_no?: string | null;
+  predictedGradeClass?: OptionVO<number>;
+  predicted_grade_class?: OptionVO<number>;
+  predictedGradeLabel?: string | null;
+  predicted_grade_label?: string | null;
+  probabilities?: PredictionProbability[];
+  importantFactors?: ImportantFactor[];
+  important_factors?: ImportantFactor[];
+  predictInput?: unknown;
+  predict_input?: unknown;
+  createdAt?: string | null;
+  created_at?: string | null;
+}
+
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+export type WarningStatus = "UNPROCESSED" | "PROCESSING" | "DONE" | "IGNORED";
+
+export interface WarningRecord {
+  id: number;
+  studentNo?: number;
+  student_no?: number;
+  studentName?: string | null;
+  student_name?: string | null;
+  classInfo?: ClassInfo | null;
+  class_info?: ClassInfo | null;
+  predictionResultId?: number | null;
+  prediction_result_id?: number | null;
+  riskScore?: number | null;
+  risk_score?: number | null;
+  riskLevel?: RiskLevel | string | null;
+  risk_level?: RiskLevel | string | null;
+  riskLevelLabel?: string | null;
+  risk_level_label?: string | null;
+  riskReasons?: string[];
+  risk_reasons?: string[];
+  suggestions?: string[];
+  status?: WarningStatus | string | null;
+  statusLabel?: string | null;
+  status_label?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+  updatedAt?: string | null;
+  updated_at?: string | null;
+}
+
+export interface WarningDetail extends WarningRecord {
+  modelVersionId?: number | null;
+  model_version_id?: number | null;
+  modelVersionNo?: string | null;
+  model_version_no?: string | null;
+  predictedGradeClass?: OptionVO<number>;
+  predicted_grade_class?: OptionVO<number>;
+  predictedGradeLabel?: string | null;
+  predicted_grade_label?: string | null;
+  handlerUserId?: number | null;
+  handler_user_id?: number | null;
+  handlerUsername?: string | null;
+  handler_username?: string | null;
+  handlerRealName?: string | null;
+  handler_real_name?: string | null;
+}
+
+export interface StudentPrediction {
+  studentNo?: number;
+  student_no?: number;
+  name?: string | null;
+  classInfo?: ClassInfo | null;
+  class_info?: ClassInfo | null;
+  prediction?: PredictionResult | null;
+  warning?: WarningRecord | null;
+}
+
+export interface WarningQuery {
+  page_num?: number;
+  page_size?: number;
+  student_no?: number;
+  student_name?: string;
+  grade_level?: number;
+  class_name?: string;
+  risk_level?: RiskLevel | string;
+  status?: WarningStatus | string;
+  start_time?: string;
+  end_time?: string;
+}

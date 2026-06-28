@@ -4,9 +4,11 @@ import AdminUsersView from "../views/AdminUsersView.vue";
 import MainLayout from "../layouts/MainLayout.vue";
 import AnalysisChartsView from "../views/AnalysisChartsView.vue";
 import LoginView from "../views/LoginView.vue";
+import ModelManagementView from "../views/ModelManagementView.vue";
 import OperationLogsView from "../views/OperationLogsView.vue";
 import StudentDetailView from "../views/StudentDetailView.vue";
 import StudentOverviewView from "../views/StudentOverviewView.vue";
+import WarningManagementView from "../views/WarningManagementView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -38,6 +40,16 @@ const router = createRouter({
           path: "analytics",
           name: "analytics",
           component: AnalysisChartsView
+        },
+        {
+          path: "models",
+          name: "models",
+          component: ModelManagementView
+        },
+        {
+          path: "warnings",
+          name: "warnings",
+          component: WarningManagementView
         },
         {
           path: "admin/users",
