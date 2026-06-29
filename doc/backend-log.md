@@ -1,3 +1,145 @@
+# 2026-06-29
+
+## 模型版本管理、训练追踪与预测约束
+
+今天后端继续完善“模型训练 -> 模型版本管理 -> 指定模型预测 -> 风险预警”的演示闭环，并补充 Python 训练产物中的可审计信息。
+
+### 模型版本管理接口
+
+新增或完善的接口：
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/StudentAnalytics/models/versions/{id}/activate` | `ADMIN` | 将指定模型版本设为当前启用模型 |
+| `PATCH` | `/StudentAnalytics/models/versions/{id}` | `ADMIN` | 修改模型版本号 |
+| `DELETE` | `/StudentAnalytics/models/versions/{id}` | `ADMIN` | 删除模型版本 |
+
+版本号修改规则：
+
+- 请求体支持 `versionNo` 和 `version_no`。
+- 版本号不能为空。
+- 版本号长度不超过 50。
+- `version_no` 在 `model_version` 表内不能重复。
+- 仅修改 `model_version.version_no`，不重命名模型文件目录；模型加载仍以 `model_path` 为准，避免文件路径失联。
+
+模型删除规则：
+
+- 当前启用模型不能删除。
+- 已被 `prediction_result` 引用的模型版本不能删除，避免破坏预测历史。
+- 删除数据库记录成功后，会尽力清理该版本目录下的模型文件、`metrics.json` 和 `train.log`。
+- 文件清理限定在 `ml.model-root-dir` 下，避免误删其他路径。
+
+新增或调整的后端结构：
+
+- `dto/ModelVersionUpdateRequest.java`
+- `controller/ModelController.java`
+- `service/ModelService.java`
+- `service/impl/ModelServiceImpl.java`
+- `mapper/ModelMapper.java`
+- `resources/mapper/ModelMapper.xml`
+
+### 训练耗时与模型可审计信息
+
+`model_version` 新增字段：
+
+```sql
+training_duration_ms BIGINT NULL COMMENT '模型训练耗时毫秒'
+```
+
+新增迁移脚本：
+
+```text
+src/main/resources/sql/apply_model_version_training_duration_patch.sql
+```
+
+后端训练接口现在会记录从导出训练数据开始，到 Python 训练进程返回结束的完整耗时，并写入 `model_version.training_duration_ms`。训练结果、模型版本列表和模型版本详情都会返回 `trainingDurationMs`。
+
+Python 训练脚本 `python/ml/train_decision.py` 新增写入以下 `metrics.json` 字段：
+
+- `training_started_at`
+- `training_finished_at`
+- `training_duration_ms`
+- `training_duration_seconds`
+- `dataset_sha256`
+
+其中 `dataset_sha256` 来自本次训练使用的 CSV 文件内容，用于判断不同训练版本是否使用同一份训练数据。今天排查“quick 和 default 指标一致”时确认：
+
+- quick 实际使用 `search_candidates = 96`；
+- default 实际使用 `search_candidates = 1728`；
+- 二者并未复用同一训练结果；
+- 指标一致是因为当前训练数据哈希一致、随机种子固定，且 default 找到的最优参数正好包含在 quick 参数网格中。
+
+### 预测模型选择与训练/测试集限制
+
+预测接口继续支持请求体传入 `model_version_id`，使用指定模型版本预测。为了避免“用训练集学生做演示预测”的误解，后端补充了模型版本样本来源判断：
+
+- Python 训练 `metrics.json` 中记录 `train_student_ids` 和 `test_student_ids`。
+- 后端读取模型版本的 `metrics.json`，判断目标学生属于训练集、测试集还是未知来源。
+- 新增预测可用性接口，用于前端判断某学生是否适合用当前模型演示预测。
+- 对训练集学生执行主动预测时，后端会返回业务提示，避免将训练样本预测当成泛化能力展示。
+
+相关结构包括：
+
+- `vo/PredictionEligibilityVO.java`
+- `controller/PredictionController.java`
+- `service/PredictionService.java`
+- `service/impl/PredictionServiceImpl.java`
+- `vo/PredictionResultVO.java`
+
+### 风险预警删除与风险公式说明
+
+风险预警模块新增删除能力：
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| `DELETE` | `/StudentAnalytics/warnings/{id}` | `ADMIN` | 删除单条风险预警记录 |
+
+删除行为：
+
+- 仅删除 `warning_record`。
+- 不删除学生信息。
+- 不删除 `prediction_result`。
+- 不删除模型版本。
+- 接入 `operation_log`，记录 `warning / DELETE` 操作日志。
+
+前端展示的风险分和风险等级说明来自后端当前规则：
+
+- 风险分：`min(各风险项加分之和, 100)`。
+- 预测等级为较差或风险：`+50`。
+- `GPA < 2.5`：`+35`。
+- 缺勤 `> 20`：`+25`；缺勤 `> 10`：`+15`。
+- 每周学习时长 `< 5` 小时：`+20`；`< 8` 小时：`+10`。
+- 家长支持 `<= 1`：`+10`。
+- 未参加课外辅导：`+5`。
+- 风险等级：`risk_score >= 50` 为 `HIGH`，`25 <= risk_score < 50` 为 `MEDIUM`，`risk_score < 25` 为 `LOW`。
+
+相关结构：
+
+- `controller/WarningController.java`
+- `service/WarningService.java`
+- `service/impl/WarningServiceImpl.java`
+- `mapper/WarningMapper.java`
+- `resources/mapper/WarningMapper.xml`
+
+## 验证记录
+
+今天完成的后端、MyBatis、Python 和前端联动代码已执行过以下验证：
+
+```bash
+python3 -m py_compile python/ml/train_decision.py
+xmllint --noout src/main/resources/mapper/ModelMapper.xml
+xmllint --noout src/main/resources/mapper/WarningMapper.xml
+mvn -q -DskipTests compile
+npm run build
+git diff --check -- src/main/java src/main/resources python frontend/src
+```
+
+另外执行过本地接口验证：
+
+- 使用 admin 登录后训练 quick 模型，确认 `trainingDurationMs` 写入 `model_version` 并从模型列表接口返回。
+- 使用 `DELETE /warnings/0` 验证风险预警删除路由生效且不会删除真实数据。
+- 使用模型版本改名、改回和删除接口验证模型版本管理链路。
+
 # 2026-06-28
 
 ## 模型训练与 `model_version` 落库

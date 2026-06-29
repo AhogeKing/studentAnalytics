@@ -159,6 +159,22 @@ public class WarningServiceImpl implements WarningService {
         return selectWarningDetail(id);
     }
 
+    @Override
+    @Transactional
+    public void deleteWarning(Integer id) {
+        if (id == null || id <= 0) {
+            throw new BusinessException("预警ID不合法");
+        }
+        WarningRecordRow current = warningMapper.selectWarningRecordById(id);
+        if (current == null) {
+            throw new BusinessException("风险预警记录不存在");
+        }
+        Integer affected = warningMapper.deleteWarningRecordById(id);
+        if (affected == null || affected == 0) {
+            throw new BusinessException("删除风险预警失败");
+        }
+    }
+
     private RiskEvaluation evaluateRisk(WarningGenerationContextRow context) {
         int score = 0;
         List<String> reasons = new ArrayList<>();

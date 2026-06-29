@@ -19,3 +19,7 @@ export function fetchLatestWarning(studentNo: number) {
 export function updateWarningStatus(id: number, status: WarningStatus | string) {
   return unwrap<WarningDetail>(apiClient.patch(`/warnings/${id}/status`, { status }));
 }
+
+export function deleteWarning(id: number) {
+  return unwrap<void>(apiClient.delete(`/warnings/${id}`));
+}

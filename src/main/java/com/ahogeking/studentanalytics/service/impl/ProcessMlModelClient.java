@@ -193,8 +193,6 @@ public class ProcessMlModelClient implements MlModelClient {
         String mode = normalizeMode(request == null ? null : request.getMode());
         if ("quick".equals(mode)) {
             command.add("--quick");
-        } else if ("exhaustive".equals(mode)) {
-            command.add("--exhaustive");
         }
         return command;
     }
@@ -206,8 +204,7 @@ public class ProcessMlModelClient implements MlModelClient {
         return switch (mode.trim().toLowerCase()) {
             case "quick" -> "quick";
             case "default" -> "default";
-            case "exhaustive" -> "exhaustive";
-            default -> throw new BusinessException("训练模式只能是 quick、default 或 exhaustive");
+            default -> throw new BusinessException("训练模式暂时只能是 quick 或 default");
         };
     }
 

@@ -17,6 +17,7 @@ import com.ahogeking.studentanalytics.service.WarningService;
 import com.ahogeking.studentanalytics.vo.ClassInfoVO;
 import com.ahogeking.studentanalytics.vo.GradeClassEnum;
 import com.ahogeking.studentanalytics.vo.ImportantFactorVO;
+import com.ahogeking.studentanalytics.vo.PredictionEligibilityVO;
 import com.ahogeking.studentanalytics.vo.PredictionProbabilityVO;
 import com.ahogeking.studentanalytics.vo.PredictionResultVO;
 import com.ahogeking.studentanalytics.vo.StudentPredictionVO;
@@ -31,6 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -42,6 +46,10 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class PredictionServiceImpl implements PredictionService {
     private static final List<String> GRADE_LABELS = List.of("A", "B", "C", "D", "F");
+    private static final String SPLIT_TRAIN = "TRAIN";
+    private static final String SPLIT_TEST = "TEST";
+    private static final String SPLIT_NEW = "NEW";
+    private static final String SPLIT_UNKNOWN = "UNKNOWN";
     private static final Map<String, Integer> LABEL_TO_CLASS = Map.of(
             "A", 0,
             "B", 1,
@@ -98,6 +106,10 @@ public class PredictionServiceImpl implements PredictionService {
         if (modelVersion.getModelPath() == null || modelVersion.getModelPath().isBlank()) {
             throw new BusinessException("模型文件路径为空");
         }
+        PredictionEligibilityVO eligibility = buildPredictionEligibility(inputRow, modelVersion);
+        if (!Boolean.TRUE.equals(eligibility.getCanPredict())) {
+            throw new BusinessException(eligibility.getReason());
+        }
 
         MlPredictionInput mlInput = toMlPredictionInput(inputRow);
         MlPredictionResult mlResult = mlModelClient.predictGradeClass(Paths.get(modelVersion.getModelPath()), mlInput);
@@ -121,6 +133,19 @@ public class PredictionServiceImpl implements PredictionService {
             vo.setWarning(warning);
         }
         return vo;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PredictionEligibilityVO selectPredictionEligibility(Integer studentNo, Integer modelVersionId) {
+        if (studentNo == null || studentNo <= 0) {
+            throw new BusinessException("学生编号不合法");
+        }
+        PredictionInputRow inputRow = predictionMapper.selectPredictionInputByStudentNo(studentNo);
+        if (inputRow == null) {
+            throw new BusinessException("学生不存在或已删除");
+        }
+        return buildPredictionEligibility(inputRow, selectModelVersion(modelVersionId));
     }
 
     @Override
@@ -161,6 +186,10 @@ public class PredictionServiceImpl implements PredictionService {
 
     private ModelVersion selectModelVersion(PredictionRequest request) {
         Integer modelVersionId = request == null ? null : request.getModelVersionId();
+        return selectModelVersion(modelVersionId);
+    }
+
+    private ModelVersion selectModelVersion(Integer modelVersionId) {
         if (modelVersionId != null) {
             ModelVersion modelVersion = modelMapper.selectModelVersionById(modelVersionId);
             if (modelVersion == null) {
@@ -173,6 +202,75 @@ public class PredictionServiceImpl implements PredictionService {
             throw new BusinessException("当前没有启用的模型，请管理员先训练模型");
         }
         return active;
+    }
+
+    private PredictionEligibilityVO buildPredictionEligibility(PredictionInputRow inputRow, ModelVersion modelVersion) {
+        String datasetSplit = resolveDatasetSplit(modelVersion, inputRow.getStudentNo());
+        PredictionEligibilityVO vo = new PredictionEligibilityVO();
+        vo.setStudentNo(inputRow.getStudentNo());
+        vo.setModelVersionId(modelVersion.getId());
+        vo.setModelVersionNo(modelVersion.getVersionNo());
+        vo.setDatasetSplit(datasetSplit);
+        vo.setDatasetSplitLabel(datasetSplitLabel(datasetSplit));
+
+        if (inputRow.getPerformanceId() == null) {
+            vo.setCanPredict(false);
+            vo.setReason("该学生暂无学业表现记录，无法进行预测");
+            return vo;
+        }
+        if (SPLIT_TRAIN.equals(datasetSplit)) {
+            vo.setCanPredict(false);
+            vo.setReason("该学生属于当前模型训练集，预测结果只会反映模型已学习过的数据，不适合作为演示或评估样本");
+            return vo;
+        }
+        vo.setCanPredict(true);
+        vo.setReason(datasetSplitReason(datasetSplit));
+        return vo;
+    }
+
+    private String resolveDatasetSplit(ModelVersion modelVersion, Integer studentNo) {
+        if (studentNo == null) {
+            return SPLIT_UNKNOWN;
+        }
+        JsonNode metrics = readMetricsJson(modelVersion.getModelPath());
+        JsonNode trainStudentIds = metrics.path("train_student_ids");
+        JsonNode testStudentIds = metrics.path("test_student_ids");
+        if (!trainStudentIds.isArray() || !testStudentIds.isArray()) {
+            return SPLIT_UNKNOWN;
+        }
+        if (containsStudentId(trainStudentIds, studentNo)) {
+            return SPLIT_TRAIN;
+        }
+        if (containsStudentId(testStudentIds, studentNo)) {
+            return SPLIT_TEST;
+        }
+        return SPLIT_NEW;
+    }
+
+    private boolean containsStudentId(JsonNode ids, Integer studentNo) {
+        for (JsonNode id : ids) {
+            if (id.asInt() == studentNo) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String datasetSplitLabel(String datasetSplit) {
+        return switch (datasetSplit) {
+            case SPLIT_TRAIN -> "训练集";
+            case SPLIT_TEST -> "测试集";
+            case SPLIT_NEW -> "新增样本";
+            default -> "未知";
+        };
+    }
+
+    private String datasetSplitReason(String datasetSplit) {
+        return switch (datasetSplit) {
+            case SPLIT_TEST -> "该学生属于当前模型测试集，适合用于演示模型预测效果";
+            case SPLIT_NEW -> "该学生未参与当前模型训练或测试，可作为真实新增样本进行预测";
+            default -> "该模型版本未记录训练/测试集学生编号，无法判断样本来源";
+        };
     }
 
     private MlPredictionInput toMlPredictionInput(PredictionInputRow row) {
@@ -357,6 +455,9 @@ public class PredictionServiceImpl implements PredictionService {
         root.put("student_no", row.getStudentNo());
         root.put("model_version_id", modelVersion.getId());
         root.put("model_version_no", modelVersion.getVersionNo());
+        String datasetSplit = resolveDatasetSplit(modelVersion, row.getStudentNo());
+        root.put("dataset_split", datasetSplit);
+        root.put("dataset_split_label", datasetSplitLabel(datasetSplit));
 
         JsonNode featuresNode = objectMapper.valueToTree(mlInput);
         ObjectNode features = featuresNode instanceof ObjectNode
@@ -402,7 +503,10 @@ public class PredictionServiceImpl implements PredictionService {
                 new TypeReference<List<ImportantFactorVO>>() {
                 }
         ));
-        vo.setPredictInput(readJsonNode(row.getPredictInputJson()));
+        JsonNode predictInput = readJsonNode(row.getPredictInputJson());
+        vo.setPredictInput(predictInput);
+        vo.setDatasetSplit(text(predictInput, "dataset_split", null));
+        vo.setDatasetSplitLabel(text(predictInput, "dataset_split_label", null));
         vo.setCreatedAt(row.getCreatedAt());
         return vo;
     }
@@ -424,6 +528,33 @@ public class PredictionServiceImpl implements PredictionService {
         } catch (Exception e) {
             return objectMapper.createObjectNode();
         }
+    }
+
+    private JsonNode readMetricsJson(String modelPath) {
+        if (modelPath == null || modelPath.isBlank()) {
+            return objectMapper.createObjectNode();
+        }
+        Path parent = Paths.get(modelPath).getParent();
+        if (parent == null) {
+            return objectMapper.createObjectNode();
+        }
+        Path metricsPath = parent.resolve("metrics.json");
+        if (!Files.exists(metricsPath)) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            return objectMapper.readTree(metricsPath.toFile());
+        } catch (IOException e) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private String text(JsonNode node, String fieldName, String defaultValue) {
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return defaultValue;
+        }
+        return value.asText();
     }
 
     private <T> List<T> readJsonList(String json, TypeReference<List<T>> typeReference) {

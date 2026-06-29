@@ -26,5 +26,6 @@ public class ModelVersionDetailVO {
     private String modelPath;
     private Boolean active;
     private LocalDateTime trainedAt;
+    private Long trainingDurationMs;
     private LocalDateTime createdAt;
 }

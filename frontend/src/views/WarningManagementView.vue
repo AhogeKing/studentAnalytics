@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
-import { Refresh, Search, View } from "@element-plus/icons-vue";
-import { fetchWarningDetail, fetchWarnings, updateWarningStatus } from "../api/warning";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { Delete as DeleteIcon, QuestionFilled, Refresh, Search, View } from "@element-plus/icons-vue";
+import { deleteWarning, fetchWarningDetail, fetchWarnings, updateWarningStatus } from "../api/warning";
+import { useAuthStore } from "../stores/auth";
 import type { ClassInfo, WarningDetail, WarningQuery, WarningRecord, WarningStatus } from "../types";
 
 const router = useRouter();
+const authStore = useAuthStore();
 const loading = ref(false);
 const detailLoading = ref(false);
 const statusSaving = ref(false);
+const deletingId = ref<number | null>(null);
 const warnings = ref<WarningRecord[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -41,9 +44,21 @@ const statusOptions: Array<{ value: WarningStatus; label: string }> = [
   { value: "IGNORED", label: "已忽略" }
 ];
 
+const riskScoreFormula = [
+  "来源：后端根据预测结果和当前学业表现生成 warning_record.risk_score。",
+  "公式：min(各风险项加分之和, 100)。",
+  "加分项：预测等级为较差/风险 +50；GPA < 2.5 +35；缺勤 >20 +25，缺勤 >10 +15；每周学习时长 <5 小时 +20，<8 小时 +10；家长支持 <=1 +10；未参加课外辅导 +5。"
+];
+
+const riskLevelFormula = [
+  "来源：后端根据 risk_score 映射 warning_record.risk_level。",
+  "公式：risk_score >= 50 为 HIGH 高风险；25 <= risk_score < 50 为 MEDIUM 中风险；risk_score < 25 为 LOW 低风险。"
+];
+
 const highRiskCount = computed(() => warnings.value.filter((item) => riskLevel(item) === "HIGH").length);
 const processingCount = computed(() => warnings.value.filter((item) => status(item) === "PROCESSING").length);
 const pendingCount = computed(() => warnings.value.filter((item) => status(item) === "UNPROCESSED").length);
+const canDelete = computed(() => authStore.role.toLowerCase() === "admin");
 
 function coalesce<T>(...values: Array<T | null | undefined>) {
   return values.find((value) => value !== undefined && value !== null) ?? null;
@@ -249,6 +264,40 @@ async function saveStatus() {
   }
 }
 
+async function handleDeleteWarning(item: WarningRecord) {
+  if (!item.id) {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认删除 ${studentName(item)} / ${studentNo(item) || "-"} 的这条风险预警吗？删除不会影响学生信息、预测结果或模型版本。`,
+      "删除风险预警",
+      {
+        type: "warning",
+        confirmButtonText: "删除",
+        cancelButtonText: "取消",
+        confirmButtonClass: "el-button--danger"
+      }
+    );
+  } catch {
+    return;
+  }
+
+  deletingId.value = item.id;
+  try {
+    await deleteWarning(item.id);
+    ElMessage.success("风险预警已删除");
+    if (warnings.value.length === 1 && page.value > 1) {
+      page.value -= 1;
+    }
+    await loadWarnings();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "删除风险预警失败");
+  } finally {
+    deletingId.value = null;
+  }
+}
+
 function goStudentDetail(item: WarningRecord | WarningDetail | null) {
   const no = studentNo(item);
   if (!no) {
@@ -362,12 +411,38 @@ onMounted(() => {
         <el-table-column label="班级" min-width="128">
           <template #default="{ row }">{{ classInfo(row)?.class_name || "-" }}</template>
         </el-table-column>
-        <el-table-column label="风险等级" width="116">
+        <el-table-column width="126">
+          <template #header>
+            <span class="metric-column-head">
+              风险等级
+              <el-tooltip placement="top" popper-class="warning-formula-tooltip">
+                <template #content>
+                  <div class="warning-tooltip-content">
+                    <p v-for="item in riskLevelFormula" :key="item">{{ item }}</p>
+                  </div>
+                </template>
+                <el-icon><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">
             <el-tag :type="riskTagType(riskLevel(row))" effect="light">{{ riskLevelLabel(row) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="风险分" width="96">
+        <el-table-column width="116">
+          <template #header>
+            <span class="metric-column-head">
+              风险分
+              <el-tooltip placement="top" popper-class="warning-formula-tooltip">
+                <template #content>
+                  <div class="warning-tooltip-content">
+                    <p v-for="item in riskScoreFormula" :key="item">{{ item }}</p>
+                  </div>
+                </template>
+                <el-icon><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ riskScore(row) ?? "-" }}</template>
         </el-table-column>
         <el-table-column label="处理状态" width="116">
@@ -381,11 +456,22 @@ onMounted(() => {
         <el-table-column label="更新时间" min-width="180">
           <template #default="{ row }">{{ formatTime(updatedAt(row)) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="132" fixed="right" align="right">
+        <el-table-column label="操作" width="208" fixed="right" align="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button size="small" :icon="View" circle title="查看详情" @click="openDetail(row)" />
               <el-button size="small" type="primary" plain @click="goStudentDetail(row)">学生</el-button>
+              <el-button
+                v-if="canDelete"
+                size="small"
+                type="danger"
+                plain
+                :icon="DeleteIcon"
+                :loading="deletingId === row.id"
+                @click="handleDeleteWarning(row)"
+              >
+                删除
+              </el-button>
             </div>
           </template>
         </el-table-column>

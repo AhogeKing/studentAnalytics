@@ -24,6 +24,12 @@ public class PredictionResultVO {
     @JsonProperty("predicted_grade_label")
     private String predictedGradeLabel;
 
+    @JsonProperty("dataset_split")
+    private String datasetSplit;
+
+    @JsonProperty("dataset_split_label")
+    private String datasetSplitLabel;
+
     private List<PredictionProbabilityVO> probabilities;
 
     @JsonProperty("important_factors")

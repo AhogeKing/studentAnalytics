@@ -8,6 +8,7 @@ import com.ahogeking.studentanalytics.common.constant.OperationTargetType;
 import com.ahogeking.studentanalytics.common.constant.OperationType;
 import com.ahogeking.studentanalytics.dto.PredictionRequest;
 import com.ahogeking.studentanalytics.service.PredictionService;
+import com.ahogeking.studentanalytics.vo.PredictionEligibilityVO;
 import com.ahogeking.studentanalytics.vo.StudentPredictionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -37,6 +39,14 @@ public class PredictionController {
             @PathVariable Integer studentNo,
             @RequestBody(required = false) PredictionRequest request) {
         return Result.success(predictionService.predictStudent(studentNo, request));
+    }
+
+    @GetMapping("/students/{studentNo}/eligibility")
+    @RequireRole({"ADMIN", "TEACHER"})
+    public Result<PredictionEligibilityVO> getPredictionEligibility(
+            @PathVariable Integer studentNo,
+            @RequestParam(name = "model_version_id", required = false) Integer modelVersionId) {
+        return Result.success(predictionService.selectPredictionEligibility(studentNo, modelVersionId));
     }
 
     @GetMapping("/{id}")

@@ -172,6 +172,7 @@ CREATE TABLE model_version
     encoder_path          VARCHAR(255)  NULL COMMENT '编码器文件路径',
     is_active             TINYINT       NOT NULL DEFAULT 0 COMMENT '当前是否启用 1 current model, 0 inactive',
     trained_at            DATETIME      NULL COMMENT '训练时间',
+    training_duration_ms  BIGINT        NULL COMMENT '模型训练耗时毫秒',
     created_by            INT           NULL,
     created_at            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),

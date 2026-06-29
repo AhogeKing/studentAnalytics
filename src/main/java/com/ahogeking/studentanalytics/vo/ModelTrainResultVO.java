@@ -28,4 +28,5 @@ public class ModelTrainResultVO {
     private String modelPath;
     private Boolean active;
     private LocalDateTime trainedAt;
+    private Long trainingDurationMs;
 }

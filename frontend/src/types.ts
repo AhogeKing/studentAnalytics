@@ -358,11 +358,16 @@ export type AnalysisScopeMode = "all" | "grade" | "classes";
 export type AnalysisColorMode = "gradeClass" | "gpaBucket";
 export type AnalysisDisplayMode = "dim" | "only";
 
-export type ModelTrainMode = "quick" | "default" | "exhaustive";
+export type ModelTrainMode = "quick" | "default";
 
 export interface ModelTrainPayload {
   mode?: ModelTrainMode;
   activate?: boolean;
+}
+
+export interface ModelVersionUpdatePayload {
+  versionNo?: string;
+  version_no?: string;
 }
 
 export interface ModelVersionQuery {
@@ -393,6 +398,8 @@ export interface ModelVersion {
   is_active?: boolean | null;
   trainedAt?: string | null;
   trained_at?: string | null;
+  trainingDurationMs?: number | null;
+  training_duration_ms?: number | null;
   createdAt?: string | null;
   created_at?: string | null;
 }
@@ -437,6 +444,24 @@ export interface PredictionPayload {
   generateWarning?: boolean;
 }
 
+export type PredictionDatasetSplit = "TRAIN" | "TEST" | "NEW" | "UNKNOWN";
+
+export interface PredictionEligibility {
+  studentNo?: number;
+  student_no?: number;
+  modelVersionId?: number;
+  model_version_id?: number;
+  modelVersionNo?: string | null;
+  model_version_no?: string | null;
+  datasetSplit?: PredictionDatasetSplit | string | null;
+  dataset_split?: PredictionDatasetSplit | string | null;
+  datasetSplitLabel?: string | null;
+  dataset_split_label?: string | null;
+  canPredict?: boolean | null;
+  can_predict?: boolean | null;
+  reason?: string | null;
+}
+
 export interface PredictionProbability {
   gradeClass?: OptionVO<number>;
   grade_class?: OptionVO<number>;
@@ -463,6 +488,10 @@ export interface PredictionResult {
   predicted_grade_class?: OptionVO<number>;
   predictedGradeLabel?: string | null;
   predicted_grade_label?: string | null;
+  datasetSplit?: PredictionDatasetSplit | string | null;
+  dataset_split?: PredictionDatasetSplit | string | null;
+  datasetSplitLabel?: string | null;
+  dataset_split_label?: string | null;
   probabilities?: PredictionProbability[];
   importantFactors?: ImportantFactor[];
   important_factors?: ImportantFactor[];

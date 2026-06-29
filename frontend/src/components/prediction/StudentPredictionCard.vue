@@ -2,9 +2,12 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { DataAnalysis, Refresh } from "@element-plus/icons-vue";
-import { fetchLatestPrediction, predictStudent } from "../../api/prediction";
+import { fetchModelVersions } from "../../api/model";
+import { fetchLatestPrediction, fetchPredictionEligibility, predictStudent } from "../../api/prediction";
 import type {
   ImportantFactor,
+  ModelVersion,
+  PredictionEligibility,
   PredictionProbability,
   PredictionResult,
   StudentPrediction,
@@ -18,7 +21,12 @@ const props = defineProps<{
 
 const loading = ref(false);
 const predicting = ref(false);
+const modelsLoading = ref(false);
+const eligibilityLoading = ref(false);
 const prediction = ref<StudentPrediction | null>(null);
+const modelVersions = ref<ModelVersion[]>([]);
+const selectedModelKey = ref("active");
+const eligibility = ref<PredictionEligibility | null>(null);
 const errorText = ref("");
 
 const predictionResult = computed(() => prediction.value?.prediction || null);
@@ -34,6 +42,26 @@ const emptyDescription = computed(() => {
   }
   return "暂无预测结果，可点击执行预测生成学业风险预警。";
 });
+const selectedModelVersionId = computed(() => {
+  if (selectedModelKey.value === "active") {
+    return undefined;
+  }
+  const id = Number(selectedModelKey.value);
+  return Number.isFinite(id) ? id : undefined;
+});
+const canPredict = computed(() => (
+  Boolean(props.studentNo)
+  && props.performanceAvailable
+  && !eligibilityLoading.value
+  && eligibility.value?.can_predict !== false
+  && eligibility.value?.canPredict !== false
+));
+const eligibilitySplit = computed(() => coalesce(eligibility.value?.datasetSplit, eligibility.value?.dataset_split) || "UNKNOWN");
+const eligibilitySplitLabel = computed(() => coalesce(
+  eligibility.value?.datasetSplitLabel,
+  eligibility.value?.dataset_split_label
+) || splitLabel(eligibilitySplit.value));
+const eligibilityReason = computed(() => eligibility.value?.reason || "");
 
 function coalesce<T>(...values: Array<T | null | undefined>) {
   return values.find((value) => value !== undefined && value !== null) ?? null;
@@ -57,6 +85,10 @@ function predictedGradeClass(item?: PredictionResult | null) {
 
 function createdAt(item?: PredictionResult | null) {
   return coalesce(item?.createdAt, item?.created_at);
+}
+
+function predictionDatasetSplitLabel(item?: PredictionResult | null) {
+  return coalesce(item?.datasetSplitLabel, item?.dataset_split_label) || splitLabel(coalesce(item?.datasetSplit, item?.dataset_split));
 }
 
 function importantFactors(item?: PredictionResult | null) {
@@ -182,6 +214,41 @@ function statusTagType(status?: string | null) {
   return "danger";
 }
 
+function modelId(item: ModelVersion) {
+  return coalesce(item.id, item.modelVersionId, item.model_version_id);
+}
+
+function modelVersionOptionNo(item: ModelVersion) {
+  return coalesce(item.versionNo, item.version_no) || "-";
+}
+
+function modelActive(item: ModelVersion) {
+  return Boolean(coalesce(item.active, item.is_active));
+}
+
+function splitLabel(split?: string | null) {
+  const labels: Record<string, string> = {
+    TRAIN: "训练集",
+    TEST: "测试集",
+    NEW: "新增样本",
+    UNKNOWN: "未知"
+  };
+  return labels[split || "UNKNOWN"] || split || "未知";
+}
+
+function splitTagType(split?: string | null) {
+  if (split === "TRAIN") {
+    return "warning";
+  }
+  if (split === "TEST") {
+    return "success";
+  }
+  if (split === "NEW") {
+    return "primary";
+  }
+  return "info";
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "请求失败";
 }
@@ -209,15 +276,47 @@ async function loadLatestPrediction() {
   }
 }
 
-async function handlePredict() {
+async function loadModelVersions() {
+  modelsLoading.value = true;
+  try {
+    const result = await fetchModelVersions({ page_num: 1, page_size: 100 });
+    modelVersions.value = result.records;
+  } catch {
+    modelVersions.value = [];
+  } finally {
+    modelsLoading.value = false;
+  }
+}
+
+async function loadEligibility() {
   if (!props.studentNo || !props.performanceAvailable) {
+    eligibility.value = null;
+    return;
+  }
+  eligibilityLoading.value = true;
+  try {
+    eligibility.value = await fetchPredictionEligibility(props.studentNo, selectedModelVersionId.value);
+  } catch (error) {
+    eligibility.value = null;
+    errorText.value = errorMessage(error);
+  } finally {
+    eligibilityLoading.value = false;
+  }
+}
+
+async function handlePredict() {
+  if (!props.studentNo || !props.performanceAvailable || !canPredict.value) {
     return;
   }
   predicting.value = true;
   errorText.value = "";
   try {
-    prediction.value = await predictStudent(props.studentNo, { generate_warning: true });
+    prediction.value = await predictStudent(props.studentNo, {
+      model_version_id: selectedModelVersionId.value,
+      generate_warning: true
+    });
     ElMessage.success("预测已完成，风险预警已同步生成");
+    await loadEligibility();
   } catch (error) {
     const message = errorMessage(error);
     errorText.value = message;
@@ -229,6 +328,8 @@ async function handlePredict() {
 
 onMounted(() => {
   void loadLatestPrediction();
+  void loadModelVersions();
+  void loadEligibility();
 });
 
 watch(
@@ -236,8 +337,13 @@ watch(
   () => {
     prediction.value = null;
     void loadLatestPrediction();
+    void loadEligibility();
   }
 );
+
+watch(selectedModelKey, () => {
+  void loadEligibility();
+});
 </script>
 
 <template>
@@ -250,19 +356,54 @@ watch(
       </div>
     </div>
 
-    <div class="prediction-actions">
-      <el-button :loading="loading" @click="loadLatestPrediction">
-        <el-icon><Refresh /></el-icon>
-        刷新预测
-      </el-button>
-      <el-button
-        type="primary"
-        :loading="predicting"
-        :disabled="!studentNo || !performanceAvailable"
-        @click="handlePredict"
+    <div class="prediction-control-panel">
+      <div class="prediction-model-picker">
+        <span>预测使用模型</span>
+        <el-select
+          v-model="selectedModelKey"
+          :loading="modelsLoading"
+          :disabled="!performanceAvailable"
+          placeholder="选择模型版本"
+        >
+          <el-option label="当前启用模型" value="active" />
+          <el-option
+            v-for="model in modelVersions"
+            :key="modelId(model)"
+            :label="`${modelVersionOptionNo(model)}${modelActive(model) ? '（当前启用）' : ''}`"
+            :value="String(modelId(model))"
+          />
+        </el-select>
+      </div>
+
+      <el-alert
+        v-if="performanceAvailable && eligibility"
+        class="prediction-eligibility-alert"
+        :type="eligibilitySplit === 'TRAIN' ? 'warning' : 'info'"
+        :closable="false"
+        show-icon
       >
-        执行预测
-      </el-button>
+        <template #title>
+          <span class="prediction-eligibility-title">
+            <el-tag :type="splitTagType(eligibilitySplit)" effect="light">{{ eligibilitySplitLabel }}</el-tag>
+            {{ eligibilityReason }}
+          </span>
+        </template>
+      </el-alert>
+
+      <div class="prediction-actions">
+        <el-button :loading="loading" @click="loadLatestPrediction">
+          <el-icon><Refresh /></el-icon>
+          刷新预测
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="predicting"
+          :disabled="!canPredict"
+          @click="handlePredict"
+        >
+          主动预测
+        </el-button>
+      </div>
     </div>
 
     <el-skeleton v-if="loading" :rows="5" animated />
@@ -282,6 +423,7 @@ watch(
             <small>{{ predictedGradeLabel(predictionResult) }}</small>
           </strong>
           <p>使用模型 {{ modelVersionNo(predictionResult) }}</p>
+          <p>样本来源 {{ predictionDatasetSplitLabel(predictionResult) }}</p>
           <p>预测时间 {{ formatTime(createdAt(predictionResult)) }}</p>
           <p v-if="predictionId(predictionResult)">预测结果 #{{ predictionId(predictionResult) }}</p>
         </article>

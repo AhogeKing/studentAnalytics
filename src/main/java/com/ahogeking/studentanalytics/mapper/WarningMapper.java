@@ -34,4 +34,6 @@ public interface WarningMapper {
             @Param("status") String status,
             @Param("handlerUserId") Integer handlerUserId
     );
+
+    Integer deleteWarningRecordById(@Param("id") Integer id);
 }

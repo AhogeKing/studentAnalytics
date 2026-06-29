@@ -593,11 +593,102 @@ a {
   margin-bottom: 14px;
 }
 
+.train-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.train-running-status {
+  color: var(--sa-muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .model-train-form {
   display: grid;
   grid-template-columns: minmax(220px, 360px) minmax(220px, 1fr);
   gap: 12px;
   align-items: center;
+}
+
+.model-train-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.model-train-guide article {
+  min-width: 0;
+  min-height: 176px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dbe9ed;
+  border-radius: 8px;
+  background: #fbfefe;
+}
+
+.model-train-guide article.is-disabled {
+  background: #f6f8f9;
+  color: #8ba0a7;
+}
+
+.train-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.train-guide-head strong {
+  color: var(--sa-ink);
+  font-size: 0.94rem;
+}
+
+.model-train-guide article.is-disabled .train-guide-head strong {
+  color: #6f848b;
+}
+
+.model-train-guide dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.model-train-guide dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.model-train-guide dt {
+  color: var(--sa-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.model-train-guide dd {
+  margin: 0;
+  color: var(--sa-ink);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.model-train-guide article.is-disabled dd {
+  color: #6f848b;
+}
+
+.model-train-guide p {
+  margin: 0;
+  color: var(--sa-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .train-switch {
@@ -616,6 +707,72 @@ a {
 
 .model-active-filter {
   width: 150px;
+}
+
+.model-metric-guide {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+.model-metric-guide article {
+  min-height: 86px;
+  padding: 12px;
+  border: 1px solid #e4eef1;
+  border-radius: 8px;
+  background: #fbfefe;
+}
+
+.model-metric-guide strong {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--sa-ink);
+  font-size: 0.86rem;
+}
+
+.model-metric-guide span {
+  display: block;
+  color: var(--sa-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.metric-column-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.metric-column-head .el-icon {
+  color: #7b969f;
+  cursor: help;
+}
+
+.warning-formula-tooltip {
+  max-width: 430px;
+}
+
+.warning-tooltip-content {
+  display: grid;
+  gap: 6px;
+  line-height: 1.55;
+}
+
+.warning-tooltip-content p {
+  margin: 0;
+}
+
+.model-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.model-row-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 .model-detail {
@@ -688,12 +845,44 @@ a {
   line-height: 1.5;
 }
 
+.prediction-control-panel {
+  display: grid;
+  gap: 10px;
+  margin: -34px 0 18px;
+}
+
+.prediction-model-picker {
+  display: grid;
+  grid-template-columns: 110px minmax(240px, 360px);
+  justify-content: end;
+  align-items: center;
+  gap: 10px;
+}
+
+.prediction-model-picker span {
+  color: var(--sa-muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-align: right;
+}
+
+.prediction-eligibility-alert {
+  justify-self: stretch;
+}
+
+.prediction-eligibility-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.45;
+}
+
 .prediction-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-  margin: -48px 0 18px;
+  margin: 0;
 }
 
 .prediction-content {
@@ -1445,6 +1634,8 @@ a {
     .analysis-summary,
     .operation-summary,
     .model-train-form,
+    .model-train-guide,
+    .model-metric-guide,
     .prediction-main,
     .prediction-subgrid,
     .analysis-grid,
@@ -1469,7 +1660,19 @@ a {
 
   .prediction-actions {
     justify-content: flex-start;
+  }
+
+  .prediction-control-panel {
     margin: 0 0 14px;
+  }
+
+  .prediction-model-picker {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .prediction-model-picker span {
+    text-align: left;
   }
 
   .warning-status-panel {
@@ -1555,8 +1758,20 @@ a {
     flex-direction: column;
   }
 
+  .train-heading-actions {
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .train-running-status {
+    white-space: normal;
+  }
+
   .query-actions .el-button,
-  .panel-heading .el-button {
+  .panel-heading .el-button,
+  .train-heading-actions .el-button {
     width: 100%;
   }
 

@@ -14,6 +14,7 @@ import com.ahogeking.studentanalytics.vo.PageResultVO;
 import com.ahogeking.studentanalytics.vo.WarningDetailVO;
 import com.ahogeking.studentanalytics.vo.WarningRecordVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -87,6 +88,21 @@ public class WarningController {
             @PathVariable Integer id,
             @RequestBody WarningStatusUpdateRequest request) {
         return Result.success(warningService.updateWarningStatus(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @RequireRole({"ADMIN"})
+    @LogOperation(
+            module = OperationModule.WARNING,
+            type = OperationType.DELETE,
+            targetType = OperationTargetType.WARNING,
+            targetId = "#id",
+            businessKey = "#id",
+            recordRequest = false
+    )
+    public Result<Void> deleteWarning(@PathVariable Integer id) {
+        warningService.deleteWarning(id);
+        return Result.success();
     }
 
     private void applySnakeCaseAliases(

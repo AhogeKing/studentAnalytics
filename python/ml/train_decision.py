@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import time
 from typing import Any
 
 import joblib
@@ -50,17 +52,23 @@ def train_decision_tree(
     quick: bool = False,
     exhaustive: bool = False,
 ) -> dict[str, Any]:
+    training_started_at = datetime.now(timezone.utc)
+    training_started = time.perf_counter()
     artifact_path = Path(artifact_dir)
     artifact_path.mkdir(parents=True, exist_ok=True)
 
     model_path = artifact_path / DEFAULT_MODEL_PATH.name
     metrics_path = artifact_path / DEFAULT_METRICS_PATH.name
 
+    resolved_data_path = Path(data_path).resolve()
+    dataset_sha256 = hashlib.sha256(resolved_data_path.read_bytes()).hexdigest()
     df = load_student_performance_csv(data_path)
     X, y = build_training_xy(df)
-    X_train, X_test, y_train, y_test = train_test_split(
+    student_ids = df["StudentID"].astype(int)
+    X_train, X_test, y_train, y_test, train_student_ids, test_student_ids = train_test_split(
         X,
         y,
+        student_ids,
         test_size=TEST_SIZE,
         random_state=RANDOM_STATE,
         stratify=y,
@@ -80,18 +88,30 @@ def train_decision_tree(
 
     best_model = grid.best_estimator_
     test_metrics = evaluate_classifier(best_model, X_test, y_test)
+    training_finished_at = datetime.now(timezone.utc)
+    training_duration_ms = int(round((time.perf_counter() - training_started) * 1000))
 
     metrics = {
         "model_name": "grade_class_decision_tree",
         "algorithm": "DecisionTreeClassifier",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "data_path": str(Path(data_path).resolve()),
+        "created_at": training_finished_at.isoformat(),
+        "training_started_at": training_started_at.isoformat(),
+        "training_finished_at": training_finished_at.isoformat(),
+        "training_duration_ms": training_duration_ms,
+        "training_duration_seconds": round(training_duration_ms / 1000, 3),
+        "data_path": str(resolved_data_path),
+        "dataset_sha256": dataset_sha256,
         "model_path": str(model_path.resolve()),
         "target_column": TARGET_COLUMN,
         "feature_columns": FEATURE_COLUMNS,
         "class_labels": {str(key): value for key, value in CLASS_LABELS.items()},
         "train_rows": int(len(X_train)),
         "test_rows": int(len(X_test)),
+        "split_strategy": "train_test_split",
+        "split_random_state": RANDOM_STATE,
+        "split_test_size": TEST_SIZE,
+        "train_student_ids": sorted(int(student_id) for student_id in train_student_ids.tolist()),
+        "test_student_ids": sorted(int(student_id) for student_id in test_student_ids.tolist()),
         "label_noise": summarize_label_noise(df),
         "best_parameters": grid.best_params_,
         "search_mode": search_mode(quick=quick, exhaustive=exhaustive),

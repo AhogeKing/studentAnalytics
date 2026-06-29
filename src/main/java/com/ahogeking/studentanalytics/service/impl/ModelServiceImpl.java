@@ -4,6 +4,7 @@ import com.ahogeking.studentanalytics.config.MlProperties;
 import com.ahogeking.studentanalytics.context.SysUserContext;
 import com.ahogeking.studentanalytics.dto.ModelTrainRequest;
 import com.ahogeking.studentanalytics.dto.ModelVersionQueryRequest;
+import com.ahogeking.studentanalytics.dto.ModelVersionUpdateRequest;
 import com.ahogeking.studentanalytics.dto.ml.MlTrainResult;
 import com.ahogeking.studentanalytics.dto.row.ModelTrainingRow;
 import com.ahogeking.studentanalytics.entity.ModelVersion;
@@ -31,8 +32,11 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -65,9 +69,11 @@ public class ModelServiceImpl implements ModelService {
             Path datasetPath = projectRoot.resolve(mlProperties.getDatasetPath()).normalize();
             Path versionOutputDir = projectRoot.resolve(mlProperties.getModelRootDir()).resolve(versionNo).normalize();
 
+            long startedNanos = System.nanoTime();
             exportTrainingDataset(datasetPath);
             MlTrainResult trainResult = mlModelClient.trainDecisionTree(datasetPath, versionOutputDir, safeRequest);
-            ModelVersion modelVersion = buildModelVersion(versionNo, trainResult);
+            long trainingDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
+            ModelVersion modelVersion = buildModelVersion(versionNo, trainResult, trainingDurationMs);
 
             if (Boolean.TRUE.equals(safeRequest.getActivate())) {
                 modelMapper.deactivateAllModels();
@@ -90,6 +96,70 @@ public class ModelServiceImpl implements ModelService {
             throw new BusinessException("当前没有启用的模型，请管理员先训练模型");
         }
         return toModelVersionVO(active);
+    }
+
+    @Override
+    @Transactional
+    public ModelVersionVO activateModelVersion(Integer id) {
+        if (id == null || id <= 0) {
+            throw new BusinessException("模型版本ID不合法");
+        }
+        ModelVersion modelVersion = modelMapper.selectModelVersionById(id);
+        if (modelVersion == null) {
+            throw new BusinessException("模型版本不存在");
+        }
+        modelMapper.deactivateAllModels();
+        Integer affected = modelMapper.activateModelById(id);
+        if (affected == null || affected == 0) {
+            throw new BusinessException("启用模型版本失败");
+        }
+        return toModelVersionVO(modelMapper.selectModelVersionById(id));
+    }
+
+    @Override
+    @Transactional
+    public ModelVersionVO updateModelVersionNo(Integer id, ModelVersionUpdateRequest request) {
+        if (id == null || id <= 0) {
+            throw new BusinessException("模型版本ID不合法");
+        }
+        ModelVersion modelVersion = modelMapper.selectModelVersionById(id);
+        if (modelVersion == null) {
+            throw new BusinessException("模型版本不存在");
+        }
+        String versionNo = normalizeVersionNo(request);
+        Long duplicateCount = modelMapper.countModelVersionByVersionNo(id, versionNo);
+        if (duplicateCount != null && duplicateCount > 0) {
+            throw new BusinessException("模型版本号已存在");
+        }
+        Integer affected = modelMapper.updateModelVersionNo(id, versionNo);
+        if (affected == null || affected == 0) {
+            throw new BusinessException("修改模型版本号失败");
+        }
+        return toModelVersionVO(modelMapper.selectModelVersionById(id));
+    }
+
+    @Override
+    @Transactional
+    public void deleteModelVersion(Integer id) {
+        if (id == null || id <= 0) {
+            throw new BusinessException("模型版本ID不合法");
+        }
+        ModelVersion modelVersion = modelMapper.selectModelVersionById(id);
+        if (modelVersion == null) {
+            throw new BusinessException("模型版本不存在");
+        }
+        if (modelVersion.getIsActive() != null && modelVersion.getIsActive() == 1) {
+            throw new BusinessException("当前启用模型不能删除，请先启用其他模型版本");
+        }
+        Long predictionCount = modelMapper.countPredictionResultsByModelVersionId(id);
+        if (predictionCount != null && predictionCount > 0) {
+            throw new BusinessException("该模型版本已有预测结果引用，不能删除");
+        }
+        Integer affected = modelMapper.deleteModelVersionById(id);
+        if (affected == null || affected == 0) {
+            throw new BusinessException("删除模型版本失败");
+        }
+        deleteModelArtifacts(modelVersion.getModelPath());
     }
 
     @Override
@@ -171,7 +241,7 @@ public class ModelServiceImpl implements ModelService {
         return value == null ? "" : String.valueOf(value);
     }
 
-    private ModelVersion buildModelVersion(String versionNo, MlTrainResult trainResult) {
+    private ModelVersion buildModelVersion(String versionNo, MlTrainResult trainResult, Long trainingDurationMs) {
         JsonNode metrics = trainResult.getMetrics();
         JsonNode bestParameters = metrics.path("best_parameters");
         ModelVersion modelVersion = new ModelVersion();
@@ -191,6 +261,9 @@ public class ModelServiceImpl implements ModelService {
         modelVersion.setModelPath(trainResult.getModelFilePath().toString());
         modelVersion.setEncoderPath(null);
         modelVersion.setTrainedAt(LocalDateTime.now());
+        modelVersion.setTrainingDurationMs(trainingDurationMs != null
+                ? trainingDurationMs
+                : longValue(metrics, "training_duration_ms"));
         modelVersion.setCreatedBy(SysUserContext.getUserId());
         return modelVersion;
     }
@@ -217,6 +290,7 @@ public class ModelServiceImpl implements ModelService {
         vo.setModelPath(modelVersion.getModelPath());
         vo.setActive(modelVersion.getIsActive() != null && modelVersion.getIsActive() == 1);
         vo.setTrainedAt(modelVersion.getTrainedAt());
+        vo.setTrainingDurationMs(modelVersion.getTrainingDurationMs());
         return vo;
     }
 
@@ -232,6 +306,7 @@ public class ModelServiceImpl implements ModelService {
         vo.setF1Macro(modelVersion.getF1Macro());
         vo.setActive(modelVersion.getIsActive() != null && modelVersion.getIsActive() == 1);
         vo.setTrainedAt(modelVersion.getTrainedAt());
+        vo.setTrainingDurationMs(modelVersion.getTrainingDurationMs());
         vo.setCreatedAt(modelVersion.getCreatedAt());
         return vo;
     }
@@ -256,6 +331,7 @@ public class ModelServiceImpl implements ModelService {
         vo.setModelPath(modelVersion.getModelPath());
         vo.setActive(modelVersion.getIsActive() != null && modelVersion.getIsActive() == 1);
         vo.setTrainedAt(modelVersion.getTrainedAt());
+        vo.setTrainingDurationMs(modelVersion.getTrainingDurationMs());
         vo.setCreatedAt(modelVersion.getCreatedAt());
         return vo;
     }
@@ -281,8 +357,8 @@ public class ModelServiceImpl implements ModelService {
             safeRequest.setMode("default");
         }
         String mode = safeRequest.getMode().trim().toLowerCase();
-        if (!List.of("quick", "default", "exhaustive").contains(mode)) {
-            throw new BusinessException("训练模式只能是 quick、default 或 exhaustive");
+        if (!List.of("quick", "default").contains(mode)) {
+            throw new BusinessException("训练模式暂时只能是 quick 或 default");
         }
         safeRequest.setMode(mode);
         if (safeRequest.getActivate() == null) {
@@ -303,6 +379,41 @@ public class ModelServiceImpl implements ModelService {
             safeQuery.setPageSize(MAX_PAGE_SIZE);
         }
         return safeQuery;
+    }
+
+    private String normalizeVersionNo(ModelVersionUpdateRequest request) {
+        if (request == null || request.getVersionNo() == null || request.getVersionNo().isBlank()) {
+            throw new BusinessException("模型版本号不能为空");
+        }
+        String versionNo = request.getVersionNo().trim();
+        if (versionNo.length() > 50) {
+            throw new BusinessException("模型版本号长度不能超过50个字符");
+        }
+        return versionNo;
+    }
+
+    private void deleteModelArtifacts(String modelPath) {
+        if (modelPath == null || modelPath.isBlank()) {
+            return;
+        }
+        Path projectRoot = Paths.get(mlProperties.getProjectRoot()).toAbsolutePath().normalize();
+        Path modelRoot = projectRoot.resolve(mlProperties.getModelRootDir()).normalize();
+        Path modelFile = Paths.get(modelPath).toAbsolutePath().normalize();
+        Path versionDir = modelFile.getParent();
+        if (versionDir == null || !versionDir.startsWith(modelRoot) || versionDir.equals(modelRoot)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(versionDir)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                    // Database deletion should not be rolled back only because a stale artifact file is locked.
+                }
+            });
+        } catch (IOException ignored) {
+            // Best-effort cleanup; the database record is the source of truth for model availability.
+        }
     }
 
     private String generateVersionNo() {
@@ -331,6 +442,14 @@ public class ModelServiceImpl implements ModelService {
             return null;
         }
         return value.asInt();
+    }
+
+    private Long longValue(JsonNode node, String fieldName) {
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        return value.asLong();
     }
 
     private BigDecimal decimal(JsonNode node, String fieldName) {

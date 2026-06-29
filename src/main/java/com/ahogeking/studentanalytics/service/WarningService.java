@@ -18,4 +18,6 @@ public interface WarningService {
     WarningDetailVO selectWarningDetail(Integer id);
 
     WarningDetailVO updateWarningStatus(Integer id, WarningStatusUpdateRequest request);
+
+    void deleteWarning(Integer id);
 }

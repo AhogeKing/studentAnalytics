@@ -8,15 +8,19 @@ import com.ahogeking.studentanalytics.common.constant.OperationTargetType;
 import com.ahogeking.studentanalytics.common.constant.OperationType;
 import com.ahogeking.studentanalytics.dto.ModelTrainRequest;
 import com.ahogeking.studentanalytics.dto.ModelVersionQueryRequest;
+import com.ahogeking.studentanalytics.dto.ModelVersionUpdateRequest;
 import com.ahogeking.studentanalytics.exception.BusinessException;
 import com.ahogeking.studentanalytics.service.ModelService;
 import com.ahogeking.studentanalytics.vo.ModelTrainResultVO;
 import com.ahogeking.studentanalytics.vo.ModelVersionDetailVO;
 import com.ahogeking.studentanalytics.vo.ModelVersionVO;
 import com.ahogeking.studentanalytics.vo.PageResultVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,6 +55,50 @@ public class ModelController {
     @RequireRole({"ADMIN", "TEACHER"})
     public Result<ModelVersionVO> getActiveModel() {
         return Result.success(modelService.selectActiveModel());
+    }
+
+    @PostMapping("/versions/{id}/activate")
+    @RequireRole({"ADMIN"})
+    @LogOperation(
+            module = OperationModule.MODEL,
+            type = OperationType.ACTIVATE,
+            targetType = OperationTargetType.MODEL_VERSION,
+            targetId = "#id",
+            businessKey = "#id",
+            recordRequest = false
+    )
+    public Result<ModelVersionVO> activateModelVersion(@PathVariable Integer id) {
+        return Result.success(modelService.activateModelVersion(id));
+    }
+
+    @PatchMapping("/versions/{id}")
+    @RequireRole({"ADMIN"})
+    @LogOperation(
+            module = OperationModule.MODEL,
+            type = OperationType.UPDATE,
+            targetType = OperationTargetType.MODEL_VERSION,
+            targetId = "#id",
+            businessKey = "#request.versionNo"
+    )
+    public Result<ModelVersionVO> updateModelVersion(
+            @PathVariable Integer id,
+            @RequestBody @Valid ModelVersionUpdateRequest request) {
+        return Result.success(modelService.updateModelVersionNo(id, request));
+    }
+
+    @DeleteMapping("/versions/{id}")
+    @RequireRole({"ADMIN"})
+    @LogOperation(
+            module = OperationModule.MODEL,
+            type = OperationType.DELETE,
+            targetType = OperationTargetType.MODEL_VERSION,
+            targetId = "#id",
+            businessKey = "#id",
+            recordRequest = false
+    )
+    public Result<Void> deleteModelVersion(@PathVariable Integer id) {
+        modelService.deleteModelVersion(id);
+        return Result.success();
     }
 
     @GetMapping("/versions")

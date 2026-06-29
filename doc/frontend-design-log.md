@@ -1,3 +1,150 @@
+# 2026-06-29
+
+## 本次前端范围
+
+今天继续完善模型管理、学生预测和风险预警三个页面的演示闭环。重点是把后端新增的模型版本管理、训练耗时、指定模型预测、训练/测试集提示、风险预警删除和风险公式说明落到可操作界面中。
+
+## 模型管理页
+
+页面路径：
+
+```text
+/models
+```
+
+新增或调整能力：
+
+- 模型版本列表支持切换当前启用模型。
+- 模型版本列表支持修改版本号。
+- 模型版本列表支持删除未启用且未被预测结果引用的模型版本。
+- 模型版本列表新增“训练耗时”列。
+- 模型版本详情抽屉新增“训练耗时”。
+- 模型列表的 Accuracy、Precision、Recall、F1 表头增加 `?` 图标和解释。
+- 训练完成提示展示训练耗时。
+- 训练中状态在页面切换后保持，避免用户离开再回来后重复点击训练。
+- 训练中显示实时已用时，并将“正在执行标准训练，已用时 ...”放在“训练中”按钮左侧。
+- 前端等待训练结果的超时时间调整为：
+  - quick：5 分钟；
+  - default：10 分钟。
+- 暂时关闭完整搜索入口，只保留快速训练和标准训练。
+- 训练模式说明卡片只保留模型相关信息：深度范围、搜索规模、Apple M1 参考耗时。
+- 快速训练参考耗时调整为 `Apple M1 通常约 5-60 秒`。
+- 标准训练参考耗时调整为 `Apple M1 通常约 2-5 分钟`。
+
+新增或调整的前端结构：
+
+- `frontend/src/api/model.ts`
+- `frontend/src/stores/modelTraining.ts`
+- `frontend/src/views/ModelManagementView.vue`
+- `frontend/src/types.ts`
+- `frontend/src/styles/main.css`
+
+对接接口：
+
+| 方法 | 路径 | 前端用途 |
+| --- | --- | --- |
+| `POST` | `/models/versions/{id}/activate` | 切换当前启用模型 |
+| `PATCH` | `/models/versions/{id}` | 修改模型版本号 |
+| `DELETE` | `/models/versions/{id}` | 删除模型版本 |
+| `GET` | `/models/versions` | 列表展示训练耗时 |
+| `GET` | `/models/versions/{id}` | 详情展示训练耗时和 metrics |
+
+交互规则：
+
+- 当前启用模型不显示删除按钮。
+- 删除模型版本前弹出确认框。
+- 删除成功后刷新模型列表和当前启用模型。
+- 修改版本号使用输入弹窗，前端校验非空和长度。
+- 训练按钮在全局训练任务完成前保持禁用状态。
+
+## 学生详情预测卡片
+
+学生详情页继续完善“主动预测”体验。
+
+新增或调整能力：
+
+- 支持在前端选择要使用的模型版本。
+- 支持查看当前模型对该学生是否适合预测。
+- 区分训练集和测试集学生：
+  - 测试集学生可以用于演示主动预测；
+  - 训练集学生会给出不建议预测的提示；
+  - 模型未记录样本来源时展示未知来源提示。
+- 预测结果显示使用的模型版本 ID 和版本号。
+- 前端预测请求可以带 `model_version_id`。
+
+相关结构：
+
+- `frontend/src/api/prediction.ts`
+- `frontend/src/components/prediction/StudentPredictionCard.vue`
+- `frontend/src/types.ts`
+
+对接接口：
+
+| 方法 | 路径 | 前端用途 |
+| --- | --- | --- |
+| `GET` | `/predictions/students/{studentNo}/eligibility` | 查询学生对当前模型的预测适用性 |
+| `POST` | `/predictions/students/{studentNo}` | 指定模型版本执行预测 |
+
+## 风险预警列表
+
+页面路径：
+
+```text
+/warnings
+```
+
+新增或调整能力：
+
+- 预警列表新增删除按钮，仅 `ADMIN` 可见。
+- 删除前弹出确认框。
+- 删除成功后刷新当前列表；如果当前页删空且不是第一页，则自动回到上一页。
+- `风险等级` 表头新增 `?` 图标。
+- `风险分` 表头新增 `?` 图标。
+- 鼠标悬浮后展示参数来源和后端当前计算公式。
+
+风险分 tooltip 说明：
+
+- 来源：后端根据预测结果和当前学业表现生成 `warning_record.risk_score`。
+- 公式：`min(各风险项加分之和, 100)`。
+- 加分项：预测等级、GPA、缺勤、学习时长、家长支持、课外辅导。
+
+风险等级 tooltip 说明：
+
+- 来源：后端根据 `risk_score` 映射 `warning_record.risk_level`。
+- `risk_score >= 50` 为 `HIGH` 高风险。
+- `25 <= risk_score < 50` 为 `MEDIUM` 中风险。
+- `risk_score < 25` 为 `LOW` 低风险。
+
+相关结构：
+
+- `frontend/src/api/warning.ts`
+- `frontend/src/views/WarningManagementView.vue`
+- `frontend/src/styles/main.css`
+
+对接接口：
+
+| 方法 | 路径 | 前端用途 |
+| --- | --- | --- |
+| `DELETE` | `/warnings/{id}` | 删除单条预警记录 |
+
+## 视觉和交互细节
+
+- 模型和预警表头的 `?` 图标复用统一的 `metric-column-head` 样式。
+- 长公式 tooltip 使用 `warning-formula-tooltip` 限制最大宽度，避免提示框过宽。
+- 模型训练说明卡片移除了与模型无关的描述性小字，让卡片更偏参数说明。
+- 训练状态不再占用训练表单下方的整行提示，而是放在按钮组左侧，更符合用户当前注意力位置。
+
+## 验证记录
+
+本次前端实现已验证：
+
+```bash
+npm run build
+git diff --check -- frontend/src
+```
+
+浏览器侧也检查过 `/models` 的训练按钮区域结构，确认原训练中提示条已移除，新的按钮区状态容器存在。
+
 # 2026-06-28
 
 ## 本次前端范围

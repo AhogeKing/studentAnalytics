@@ -25,6 +25,7 @@ public class ModelVersion {
     private String encoderPath;
     private Integer isActive;
     private LocalDateTime trainedAt;
+    private Long trainingDurationMs;
     private Integer createdBy;
     private LocalDateTime createdAt;
 }

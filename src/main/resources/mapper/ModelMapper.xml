@@ -40,6 +40,7 @@
         <result column="encoder_path" property="encoderPath"/>
         <result column="is_active" property="isActive"/>
         <result column="trained_at" property="trainedAt"/>
+        <result column="training_duration_ms" property="trainingDurationMs"/>
         <result column="created_by" property="createdBy"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
@@ -63,6 +64,7 @@
         encoder_path,
         is_active,
         trained_at,
+        training_duration_ms,
         created_by,
         created_at
     </sql>
@@ -94,6 +96,23 @@
         WHERE is_active = 1
     </update>
 
+    <update id="activateModelById">
+        UPDATE model_version
+        SET is_active = 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateModelVersionNo">
+        UPDATE model_version
+        SET version_no = #{versionNo}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteModelVersionById">
+        DELETE FROM model_version
+        WHERE id = #{id}
+    </delete>
+
     <insert id="insertModelVersion"
             parameterType="com.ahogeking.studentanalytics.entity.ModelVersion"
             useGeneratedKeys="true"
@@ -116,6 +135,7 @@
             encoder_path,
             is_active,
             trained_at,
+            training_duration_ms,
             created_by
         )
         VALUES (
@@ -136,6 +156,7 @@
             #{encoderPath},
             #{isActive},
             #{trainedAt},
+            #{trainingDurationMs},
             #{createdBy}
         )
     </insert>
@@ -154,6 +175,19 @@
             <include refid="ModelVersionColumns"/>
         FROM model_version
         WHERE id = #{id}
+    </select>
+
+    <select id="countModelVersionByVersionNo" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM model_version
+        WHERE version_no = #{versionNo}
+          AND id != #{id}
+    </select>
+
+    <select id="countPredictionResultsByModelVersionId" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM prediction_result
+        WHERE model_version_id = #{id}
     </select>
 
     <sql id="ModelVersionWhere">

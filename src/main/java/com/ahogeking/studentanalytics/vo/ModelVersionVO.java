@@ -17,5 +17,6 @@ public class ModelVersionVO {
     private BigDecimal f1Macro;
     private Boolean active;
     private LocalDateTime trainedAt;
+    private Long trainingDurationMs;
     private LocalDateTime createdAt;
 }

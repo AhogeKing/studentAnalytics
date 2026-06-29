@@ -220,4 +220,9 @@
             handler_user_id = #{handlerUserId}
         WHERE id = #{id}
     </update>
+
+    <delete id="deleteWarningRecordById">
+        DELETE FROM warning_record
+        WHERE id = #{id}
+    </delete>
 </mapper>

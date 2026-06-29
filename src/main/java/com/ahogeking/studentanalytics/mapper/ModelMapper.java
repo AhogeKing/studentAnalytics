@@ -14,11 +14,27 @@ public interface ModelMapper {
 
     Integer deactivateAllModels();
 
+    Integer activateModelById(@Param("id") Integer id);
+
     Integer insertModelVersion(ModelVersion modelVersion);
+
+    Integer updateModelVersionNo(
+            @Param("id") Integer id,
+            @Param("versionNo") String versionNo
+    );
+
+    Integer deleteModelVersionById(@Param("id") Integer id);
 
     ModelVersion selectActiveModelVersion();
 
     ModelVersion selectModelVersionById(@Param("id") Integer id);
+
+    Long countModelVersionByVersionNo(
+            @Param("id") Integer id,
+            @Param("versionNo") String versionNo
+    );
+
+    Long countPredictionResultsByModelVersionId(@Param("id") Integer id);
 
     Long countModelVersions(@Param("query") ModelVersionQueryRequest query);
 
