@@ -1,4 +1,927 @@
+# 2026-06-28
+
+## 模型训练与 `model_version` 落库
+
+本节记录“模型训练 -> 模型版本归档 -> `model_version` 落库”这一条主线。单学生预测和风险预警已在后续小节补齐。
+
+### 实现边界
+
+已实现：
+
+- 从数据库视图 `v_student_model_dataset` 读取当前训练数据。
+- 按 Python 训练脚本要求导出 CSV 字段：
+  - `StudentID`
+  - `Age`
+  - `Gender`
+  - `Ethnicity`
+  - `ParentalEducation`
+  - `StudyTimeWeekly`
+  - `Absences`
+  - `Tutoring`
+  - `ParentalSupport`
+  - `Extracurricular`
+  - `Sports`
+  - `Music`
+  - `Volunteering`
+  - `GPA`
+  - `GradeClass`
+- 调用 `python/ml/train_decision.py` 执行决策树训练。
+- 将每次训练产物输出到独立版本目录：
+
+```text
+runtime/ml/models/{versionNo}/
+├── grade_class_decision_tree.joblib
+├── metrics.json
+└── train.log
+```
+
+- 从 `metrics.json` 读取模型指标和最佳参数。
+- 写入 `model_version` 表。
+- `activate = true` 时停用旧模型并启用新模型。
+- 训练接口接入 `operation_log`，记录 `model / TRAIN` 审计日志。
+
+暂未实现：
+
+- 模型版本回滚接口。
+- 异步训练任务队列。
+- 训练任务进度查询。
+
+### 新增或补齐的后端结构
+
+配置：
+
+- `config/MlProperties.java`：读取 `ml.*` 配置项。
+
+DTO：
+
+- `dto/ModelTrainRequest.java`：训练请求参数。
+- `dto/ModelVersionQueryRequest.java`：模型版本分页筛选参数。
+- `dto/ml/MlTrainResult.java`：Python 训练调用结果。
+- `dto/row/ModelTrainingRow.java`：训练数据导出行。
+
+实体：
+
+- `entity/ModelVersion.java`：对应 `model_version` 表。
+
+Mapper：
+
+- `mapper/ModelMapper.java`
+- `resources/mapper/ModelMapper.xml`
+
+Service：
+
+- `service/MlModelClient.java`
+- `service/ModelService.java`
+- `service/impl/ProcessMlModelClient.java`
+- `service/impl/ModelServiceImpl.java`
+
+VO：
+
+- `vo/ModelTrainResultVO.java`
+- `vo/ModelVersionVO.java`
+- `vo/ModelVersionDetailVO.java`
+
+Controller：
+
+- `controller/ModelController.java`
+
+### 新增配置
+
+`application.yml` 新增：
+
+```yaml
+ml:
+  python-path: python3
+  project-root: .
+  script-dir: python/ml
+  train-script-name: train_decision.py
+  dataset-path: dataset/Student_performance_data_.csv
+  artifact-dir: python/ml/artifacts
+  model-root-dir: runtime/ml/models
+  train-timeout-seconds: 600
+```
+
+当前 Java 后端会把数据库训练数据导出到 `dataset/Student_performance_data_.csv`，然后调用：
+
+```bash
+python3 python/ml/train_decision.py \
+  --data-path dataset/Student_performance_data_.csv \
+  --artifact-dir runtime/ml/models/{versionNo}
+```
+
+### 新增接口
+
+基础路径：
+
+```text
+/StudentAnalytics/models
+```
+
+#### 训练决策树模型
+
+```http
+POST /StudentAnalytics/models/decision-tree/train
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+权限：
+
+- `ADMIN`
+
+请求体：
+
+```json
+{
+  "mode": "quick",
+  "activate": true
+}
+```
+
+字段说明：
+
+| 字段 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `mode` | string | `default` | `quick`、`default`、`exhaustive` |
+| `activate` | boolean | `true` | 训练成功后是否设为当前启用模型 |
+
+后端行为：
+
+1. 使用 `v_student_model_dataset` 导出训练 CSV。
+2. 生成版本号，例如 `dt_cls_20260628104530123`。
+3. 创建版本目录 `runtime/ml/models/{versionNo}`。
+4. 调用 Python 训练脚本。
+5. 读取 `metrics.json`。
+6. 写入 `model_version`。
+7. 如果 `activate = true`，先将旧模型 `is_active` 置为 `0`，再将新模型置为 `1`。
+8. 返回训练结果。
+9. 写入操作日志 `module_name = model`、`operation_type = TRAIN`。
+
+返回数据核心字段：
+
+- `modelVersionId`
+- `versionNo`
+- `modelName`
+- `algorithm`
+- `targetColumn`
+- `featureColumns`
+- `searchMode`
+- `searchCandidates`
+- `trainRows`
+- `testRows`
+- `bestParameters`
+- `accuracy`
+- `precisionMacro`
+- `recallMacro`
+- `f1Macro`
+- `aucOvrMacro`
+- `confusionMatrix`
+- `modelPath`
+- `active`
+- `trainedAt`
+
+#### 查询当前启用模型
+
+```http
+GET /StudentAnalytics/models/active
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+返回：
+
+- 当前 `is_active = 1` 的模型版本。
+- 如果没有启用模型，返回业务错误：`当前没有启用的模型，请管理员先训练模型`。
+
+#### 查询模型版本列表
+
+```http
+GET /StudentAnalytics/models/versions?page_num=1&page_size=20
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+支持参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| `page_num` | 页码，默认 `1` |
+| `page_size` | 每页数量，默认 `20`，最大 `100` |
+| `active` | 是否只看启用或未启用模型 |
+| `start_time` | 训练开始时间，支持 `yyyy-MM-dd HH:mm:ss` 或 ISO LocalDateTime |
+| `end_time` | 训练结束时间，支持 `yyyy-MM-dd HH:mm:ss` 或 ISO LocalDateTime |
+
+返回：
+
+```text
+PageResultVO<ModelVersionVO>
+```
+
+#### 查询模型版本详情
+
+```http
+GET /StudentAnalytics/models/versions/{id}
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+返回内容：
+
+- `model_version` 表中的基础信息。
+- `feature_columns` JSON。
+- `confusion_matrix_json` JSON。
+- 对应版本目录中的完整 `metrics.json`。
+
+### 文件与 Git 忽略规则
+
+`.gitignore` 新增运行时产物忽略：
+
+```text
+runtime/ml/
+python/ml/artifacts/
+```
+
+原因：
+
+- `runtime/ml/models/` 是后端运行时训练产物目录。
+- `python/ml/artifacts/` 是 Python 独立训练的默认产物目录。
+- 两者都可能包含较大的 `.joblib` 模型文件，不应默认进入 Git。
+
+### 验证记录
+
+本次后端代码已通过：
+
+```bash
+xmllint --noout src/main/resources/mapper/ModelMapper.xml
+mvn -q -DskipTests compile
+git diff --check -- src/main/java src/main/resources .gitignore
+```
+
+补充说明：
+
+- 当前系统 Python 环境缺少 `joblib`，所以直接执行 `python3 python/ml/train_decision.py --help` 会失败。
+- 实际训练接口运行前，需要先安装 `python/ml/requirements.txt` 中的依赖。
+
+## 单学生预测与 `prediction_result` 落库
+
+本次后端继续完成“当前模型版本 -> 单学生预测 -> `prediction_result` 落库”主线。后续小节已经接入 `warning_record` 自动生成。
+
+### 实现边界
+
+已实现：
+
+- 支持按学生编号发起预测。
+- 默认使用当前启用的 `model_version`。
+- 支持请求体传入 `model_version_id`，使用指定模型版本预测。
+- 从 `student` 和 `student_performance` 查询预测所需输入字段。
+- 调用 `python/ml/predict_descision.py` 执行预测。
+- 使用 `--model-path` 指定 `model_version.model_path`。
+- 使用 `--input` 写入单学生预测输入 JSON。
+- 使用 `--output` 读取 Python 输出的预测结果 JSON。
+- 将预测等级、五类概率、重要因素、输入快照写入 `prediction_result`。
+- 默认预测后生成 `warning_record`。
+- `generate_warning = false` 时只生成 `prediction_result`。
+- 支持查询预测结果详情。
+- 支持查询某学生最近一次预测结果。
+- 预测接口接入 `operation_log`，记录 `prediction / PREDICT` 审计日志。
+
+暂未实现：
+
+- 预测结果分页列表。
+- 删除或归档历史预测结果。
+
+### 新增或补齐的后端结构
+
+DTO：
+
+- `dto/PredictionRequest.java`：预测请求参数，可选 `model_version_id`。
+- `dto/ml/MlPredictionInput.java`：传给 Python 的大写字段输入。
+- `dto/ml/MlPredictionResult.java`：Python 预测输出。
+- `dto/ml/MlImportantFeatureItem.java`：Python 返回的重要因素项。
+- `dto/row/PredictionInputRow.java`：预测输入查询行。
+- `dto/row/PredictionResultRow.java`：预测结果详情查询行。
+
+实体：
+
+- `entity/PredictionResult.java`：对应 `prediction_result` 表。
+
+Mapper：
+
+- `mapper/PredictionMapper.java`
+- `resources/mapper/PredictionMapper.xml`
+
+Service：
+
+- `service/PredictionService.java`
+- `service/impl/PredictionServiceImpl.java`
+
+VO：
+
+- `vo/StudentPredictionVO.java`
+- `vo/PredictionResultVO.java`
+- `vo/PredictionProbabilityVO.java`
+- `vo/ImportantFactorVO.java`
+
+Controller：
+
+- `controller/PredictionController.java`
+
+已有结构扩展：
+
+- `config/MlProperties.java`：新增预测脚本、临时目录和超时时间配置。
+- `service/MlModelClient.java`：新增 `predictGradeClass(...)`。
+- `service/impl/ProcessMlModelClient.java`：新增 Python 预测进程调用。
+
+### 新增配置
+
+`application.yml` 中 `ml.*` 新增：
+
+```yaml
+ml:
+  predict-script-name: predict_descision.py
+  prediction-temp-dir: runtime/ml/predictions
+  predict-timeout-seconds: 60
+```
+
+预测时 Java 后端会调用：
+
+```bash
+python3 python/ml/predict_descision.py \
+  --model-path runtime/ml/models/{versionNo}/grade_class_decision_tree.joblib \
+  --input runtime/ml/predictions/predict-input-{uuid}.json \
+  --output runtime/ml/predictions/predict-output-{uuid}.json
+```
+
+`runtime/ml/` 已经被 `.gitignore` 忽略，因此预测输入、输出临时文件和模型运行时产物不会进入 Git。
+
+### 新增接口
+
+基础路径：
+
+```text
+/StudentAnalytics/predictions
+```
+
+#### 单学生预测
+
+```http
+POST /StudentAnalytics/predictions/students/{studentNo}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+请求体可以为空：
+
+```json
+{}
+```
+
+也可以指定模型版本：
+
+```json
+{
+  "model_version_id": 3
+}
+```
+
+还可以关闭自动生成预警：
+
+```json
+{
+  "generate_warning": false
+}
+```
+
+后端行为：
+
+1. 校验学生编号。
+2. 查询学生基础信息和学业表现。
+3. 学生不存在或已删除时返回业务错误。
+4. 学生没有 `student_performance` 时返回业务错误。
+5. 未指定 `model_version_id` 时读取当前启用模型。
+6. 指定 `model_version_id` 时读取指定模型版本。
+7. 调用 Python 预测脚本。
+8. 将五类概率统一保存为 A/B/C/D/F 顺序。
+9. 将重要因素转换为包含中文标签和值的结构。
+10. 保存 `prediction_result`。
+11. 默认调用 `WarningService.generateWarningFromPrediction(...)` 生成预警。
+12. 返回保存后的预测结果和预警结果。
+13. 写入操作日志 `module_name = prediction`、`operation_type = PREDICT`。
+
+返回数据核心字段：
+
+- `student_no`
+- `name`
+- `class_info`
+- `prediction.prediction_result_id`
+- `prediction.model_version_id`
+- `prediction.model_version_no`
+- `prediction.predicted_grade_class`
+- `prediction.predicted_grade_label`
+- `prediction.probabilities`
+- `prediction.important_factors`
+- `prediction.predict_input`
+- `prediction.created_at`
+- `warning`
+
+#### 查询预测结果详情
+
+```http
+GET /StudentAnalytics/predictions/{id}
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+返回：
+
+- 指定 `prediction_result.id` 的预测结果详情。
+- 如果预测结果不存在，返回业务错误：`预测结果不存在`。
+
+#### 查询学生最近一次预测
+
+```http
+GET /StudentAnalytics/predictions/students/{studentNo}/latest
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+返回：
+
+- 指定学生最近一次预测结果。
+- 如果没有预测记录，返回业务错误：`该学生暂无预测记录`。
+
+### `prediction_result` 写入内容
+
+| 字段 | 写入内容 |
+| --- | --- |
+| `student_id` | 学生表主键 |
+| `performance_id` | 学业表现表主键 |
+| `model_version_id` | 本次使用的模型版本 |
+| `predicted_grade_class` | 预测等级编码，0-4 |
+| `predicted_grade_label` | 预测等级字母，A/B/C/D/F |
+| `probability_json` | A/B/C/D/F 五类概率数组 |
+| `important_factors_json` | 重要因素数组，包含字段名、中文标签、当前值、重要性 |
+| `predict_input_json` | 本次预测输入快照，包含学生编号、模型版本、特征、当前 GPA 和当前等级 |
+
+### 验证记录
+
+本次预测链路代码已通过：
+
+```bash
+xmllint --noout src/main/resources/mapper/PredictionMapper.xml src/main/resources/mapper/ModelMapper.xml
+mvn -q -DskipTests compile
+git diff --check -- src/main/java src/main/resources
+```
+
+补充说明：
+
+- 没有执行真实 HTTP 预测请求。
+- 真实预测依赖已存在且启用的 `model_version.model_path`。
+- 真实预测还依赖本地 Python 环境安装 `python/ml/requirements.txt` 中的 `joblib`、`numpy`、`pandas`、`scikit-learn`。
+
+## 风险预警与 `warning_record` 落库
+
+本次后端完成“预测结果 -> 风险评分 -> `warning_record` 落库 -> 预警查询和状态处理”主线。该模块仍是 V1 规则版本，不引入干预记录表，不做批量预警任务。
+
+### 实现边界
+
+已实现：
+
+- 预测成功后默认生成风险预警。
+- 支持 `generate_warning = false` 关闭本次预警生成。
+- 同一个 `prediction_result` 不重复生成多条 `warning_record`。
+- 根据预测结果和当前学业表现计算风险分数。
+- 风险分数限制在 `0-100`。
+- 风险等级固定为 `LOW`、`MEDIUM`、`HIGH`。
+- 风险原因和建议以 JSON 数组写入数据库。
+- 支持预警分页列表。
+- 支持预警详情查询。
+- 支持学生最近一次预警查询。
+- 支持修改预警状态。
+- 修改状态时写入当前登录用户到 `handler_user_id`。
+- 修改状态接口接入 `operation_log`，记录 `warning / UPDATE_STATUS`。
+
+暂未实现：
+
+- 批量生成预警。
+- 干预记录或跟进备注表。
+- 预警删除或归档。
+- 风险规则后台配置。
+- 前端预警页面。
+
+### 新增或补齐的后端结构
+
+DTO：
+
+- `dto/WarningQueryRequest.java`：预警列表筛选和分页参数。
+- `dto/WarningStatusUpdateRequest.java`：预警状态更新请求。
+- `dto/row/WarningGenerationContextRow.java`：生成预警时需要的预测和学业表现上下文。
+- `dto/row/WarningRecordRow.java`：预警列表和详情查询行。
+
+实体：
+
+- `entity/WarningRecord.java`：对应 `warning_record` 表。
+
+Mapper：
+
+- `mapper/WarningMapper.java`
+- `resources/mapper/WarningMapper.xml`
+
+Service：
+
+- `service/WarningService.java`
+- `service/impl/WarningServiceImpl.java`
+
+VO：
+
+- `vo/WarningRecordVO.java`
+- `vo/WarningDetailVO.java`
+
+Controller：
+
+- `controller/WarningController.java`
+
+已有结构扩展：
+
+- `dto/PredictionRequest.java`：新增 `generate_warning`。
+- `vo/StudentPredictionVO.java`：新增 `warning`。
+- `service/impl/PredictionServiceImpl.java`：预测成功后默认调用 `WarningService.generateWarningFromPrediction(...)`，查询预测详情和最近预测时带出关联预警。
+
+### 风险评分规则
+
+当前风险分数由以下规则叠加得到，最高截断为 `100`：
+
+| 规则 | 加分 | 原因 |
+| --- | --- | --- |
+| 预测等级为 D/F，即 `predicted_grade_class >= 3` | `+50` | 模型预测存在学业风险 |
+| 当前 `GPA < 2.5` | `+35` | 当前 GPA 偏低 |
+| 缺勤次数 `> 20` | `+25` | 缺勤次数较高 |
+| 缺勤次数 `> 10` 且 `<= 20` | `+15` | 缺勤次数偏高 |
+| 每周学习时长 `< 5` 小时 | `+20` | 学习时长过低 |
+| 每周学习时长 `< 8` 且 `>= 5` 小时 | `+10` | 学习时长偏低 |
+| 家长支持程度 `<= 1` | `+10` | 家长支持程度较低 |
+| 未参加辅导，即 `tutoring = 0` | `+5` | 当前未参加课外辅导 |
+
+风险等级：
+
+| 分数区间 | 风险等级 | 展示文案 |
+| --- | --- | --- |
+| `0-24` | `LOW` | 低风险 |
+| `25-49` | `MEDIUM` | 中风险 |
+| `50-100` | `HIGH` | 高风险 |
+
+如果没有命中明显风险规则，仍会生成一条 `LOW` 预警，原因写为“当前未发现明显高风险因素”，建议保持学习节奏并定期关注成绩变化。
+
+### 新增接口
+
+基础路径：
+
+```text
+/StudentAnalytics/warnings
+```
+
+#### 预警列表
+
+```http
+GET /StudentAnalytics/warnings?page_num=1&page_size=20
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+支持参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| `page_num` | 页码，默认 `1` |
+| `page_size` | 每页数量，默认 `20`，最大 `100` |
+| `student_no` | 学生编号 |
+| `student_name` | 学生姓名模糊查询 |
+| `grade_level` | 年级 |
+| `class_name` | 班级 |
+| `risk_level` | `LOW`、`MEDIUM`、`HIGH` |
+| `status` | `UNPROCESSED`、`PROCESSING`、`DONE`、`IGNORED` |
+| `start_time` | 创建开始时间，支持 `yyyy-MM-dd HH:mm:ss` 或 ISO LocalDateTime |
+| `end_time` | 创建结束时间，支持 `yyyy-MM-dd HH:mm:ss` 或 ISO LocalDateTime |
+
+返回：
+
+```text
+PageResultVO<WarningRecordVO>
+```
+
+列表默认只返回未软删除学生的预警记录。
+
+#### 预警详情
+
+```http
+GET /StudentAnalytics/warnings/{id}
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+返回内容：
+
+- 学生编号、姓名、班级。
+- 关联预测结果 ID。
+- 使用的模型版本。
+- 预测等级。
+- 风险分数、风险等级。
+- 风险原因、建议。
+- 当前处理状态。
+- 处理人信息。
+- 创建和更新时间。
+
+#### 学生最近一次预警
+
+```http
+GET /StudentAnalytics/warnings/students/{studentNo}/latest
+Authorization: Bearer <token>
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+返回：
+
+- 指定学生最近一次风险预警。
+- 如果不存在，返回业务错误：`该学生暂无风险预警记录`。
+
+#### 修改预警状态
+
+```http
+PATCH /StudentAnalytics/warnings/{id}/status
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+权限：
+
+- `ADMIN`
+- `TEACHER`
+
+请求体：
+
+```json
+{
+  "status": "PROCESSING"
+}
+```
+
+可选状态：
+
+| 状态 | 含义 |
+| --- | --- |
+| `UNPROCESSED` | 未处理 |
+| `PROCESSING` | 处理中 |
+| `DONE` | 已完成 |
+| `IGNORED` | 已忽略 |
+
+后端行为：
+
+1. 校验预警 ID。
+2. 校验状态枚举。
+3. 更新 `warning_record.status`。
+4. 写入当前用户 ID 到 `warning_record.handler_user_id`。
+5. 返回更新后的预警详情。
+6. 写入操作日志 `module_name = warning`、`operation_type = UPDATE_STATUS`。
+
+### `warning_record` 写入内容
+
+| 字段 | 写入内容 |
+| --- | --- |
+| `student_id` | 学生表主键 |
+| `prediction_result_id` | 关联预测结果 |
+| `risk_score` | 规则计算后的风险分数，0-100 |
+| `risk_level` | `LOW`、`MEDIUM`、`HIGH` |
+| `risk_reasons_json` | 风险原因 JSON 数组 |
+| `suggestion_json` | 建议 JSON 数组 |
+| `status` | 默认 `UNPROCESSED` |
+| `handler_user_id` | 新生成时为空；修改状态时写入当前用户 |
+
+### 验证记录
+
+本次预警链路代码已通过：
+
+```bash
+xmllint --noout src/main/resources/mapper/WarningMapper.xml src/main/resources/mapper/PredictionMapper.xml
+mvn -q -DskipTests compile
+git diff --check -- src/main/java src/main/resources
+```
+
+补充说明：
+
+- 没有执行真实 HTTP 预测和预警请求。
+- 真实链路仍依赖可用的启用模型文件和 Python ML 依赖。
+
 # 2026-06-27
+
+## 操作日志审计模块
+
+本次后端根据 `operation_log` 表结构补齐 V1 操作日志模块，定位为关键操作审计，不承载模型指标、预测结果或预警详情等业务大对象。
+
+### 数据表边界
+
+`operation_log` 只记录以下审计索引信息：
+
+- 谁操作：`user_id`、`username`、`real_name`、`user_role`。
+- 做了什么：`module_name`、`operation_type`、`operation_result`。
+- 操作对象：`target_type`、`target_id`、`business_key`。
+- 请求来源：`request_method`、`request_uri`、`ip_address`。
+- 请求内容：`request_params`、`request_body`。
+- 操作时间：`created_at`。
+
+当前不记录：
+
+- 失败原因详情。
+- 接口耗时。
+- 模型训练指标。
+- 预测结果详情。
+- 风险预警详情全文。
+
+后续模型训练、预测和预警模块仍应把业务详情分别写入 `model_version`、`prediction_result`、`warning_record` 等业务表，`operation_log` 只保留“谁在什么时候触发了什么操作”的审计记录。
+
+### 新增后端类
+
+新增或补齐以下后端结构：
+
+- `annotation/LogOperation.java`：方法级操作日志注解。
+- `aspect/OperationLogAspect.java`：AOP 统一记录成功和失败日志。
+- `common/constant/OperationModule.java`：模块常量。
+- `common/constant/OperationType.java`：操作类型常量。
+- `common/constant/OperationResult.java`：操作结果常量。
+- `common/constant/OperationTargetType.java`：目标对象类型常量。
+- `entity/OperationLog.java`：对应 `operation_log` 表。
+- `dto/OperationLogQueryRequest.java`：操作日志分页筛选参数。
+- `mapper/OperationLogMapper.java` 和 `mapper/OperationLogMapper.xml`：日志写入、分页查询、详情查询。
+- `service/OperationLogService.java` 和 `service/impl/OperationLogServiceImpl.java`：日志保存、列表、详情、筛选选项。
+- `vo/OperationLogVO.java`：列表页 VO，不包含请求 JSON。
+- `vo/OperationLogDetailVO.java`：详情页 VO，包含 `request_params` 和 `request_body`。
+- `vo/OperationLogOptionsVO.java`：筛选项 VO。
+
+`pom.xml` 新增 `spring-boot-starter-aop`，用于启用操作日志切面。
+
+### 日志注解
+
+`@LogOperation` 支持以下字段：
+
+- `module`：模块名，例如 `user`、`student`、`performance`、`auth`。
+- `type`：操作类型，例如 `CREATE`、`UPDATE`、`DELETE`、`UPSERT`、`RESET_PASSWORD`、`LOGOUT`。
+- `targetType`：操作对象类型，例如 `USER`、`STUDENT`、`PERFORMANCE`。
+- `targetId`：SpEL 表达式，例如 `#id`、`#studentNo`、`#request.username`。
+- `businessKey`：业务标识 SpEL 表达式。
+- `recordRequest`：是否记录请求参数和请求体，默认记录。
+
+### AOP 记录规则
+
+`OperationLogAspect` 使用 `@Around` 拦截带 `@LogOperation` 的 Controller 方法：
+
+- Controller 正常返回后写入 `operation_result = SUCCESS`。
+- Controller 抛出异常时写入 `operation_result = FAIL`，然后继续抛出原异常。
+- 日志写入异常不会影响主业务。
+- 日志保存方法使用 `REQUIRES_NEW` 事务，避免主业务回滚时失败日志也被回滚。
+
+日志会从 `SysUserContext` 中读取当前登录用户并保存操作者快照。即使用户后续改名、改角色、禁用或删除，历史日志仍能显示当时的用户名、真实姓名和角色。
+
+HTTP 信息记录规则：
+
+- `request_method` 取当前请求方法。
+- `request_uri` 取当前请求路径。
+- `ip_address` 优先取 `X-Forwarded-For`，其次取 `X-Real-IP`，最后取 `remoteAddr`。
+
+请求内容记录规则：
+
+- `request_params` 保存 URL 查询参数 JSON。
+- `request_body` 保存 Controller 方法参数中的业务请求对象。
+- 自动过滤 `HttpServletRequest`、`HttpServletResponse`、`MultipartFile`、`BindingResult` 等框架对象。
+- 字段名包含 `password`、`token`、`authorization` 时统一脱敏为 `***`。
+- 没有内容时写入 `{}`，保证 MySQL JSON 字段合法。
+
+### 操作日志管理接口
+
+全部接口需要 `ADMIN` 权限：
+
+基础路径：
+
+```text
+/StudentAnalytics/admin/operation-logs
+```
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/admin/operation-logs` | 操作日志分页列表 |
+| `GET` | `/admin/operation-logs/{id}` | 操作日志详情 |
+| `GET` | `/admin/operation-logs/options` | 日志筛选选项 |
+
+分页和筛选参数：
+
+- `page_num`
+- `page_size`
+- `userId`
+- `username`
+- `user_role`
+- `module_name`
+- `operation_type`
+- `operation_result`
+- `target_type`
+- `target_id`
+- `business_key`
+- `start_time`
+- `end_time`
+- `keyword`
+
+分页默认：
+
+- `page_num = 1`
+- `page_size = 20`
+- 最大 `page_size = 100`
+
+时间参数支持：
+
+- `yyyy-MM-dd HH:mm:ss`
+- ISO LocalDateTime，例如 `2026-06-27T20:30:00`
+
+列表返回 `PageResultVO<OperationLogVO>`，不返回 `request_params` 和 `request_body`，避免表格数据过大。
+
+详情返回 `OperationLogDetailVO`，包含完整请求参数和请求体 JSON。
+
+### 已接入自动日志的接口
+
+用户管理：
+
+| 方法 | 路径 | 模块 | 操作类型 |
+| --- | --- | --- | --- |
+| `POST` | `/admin/users` | `user` | `CREATE` |
+| `PUT` | `/admin/users/{id}` | `user` | `UPDATE` |
+| `PATCH` | `/admin/users/{id}/status` | `user` | `UPDATE_STATUS` |
+| `PATCH` | `/admin/users/{id}/password` | `user` | `RESET_PASSWORD` |
+| `DELETE` | `/admin/users/{id}` | `user` | `DISABLE` |
+
+学生管理：
+
+| 方法 | 路径 | 模块 | 操作类型 |
+| --- | --- | --- | --- |
+| `POST` | `/students` | `student` | `CREATE` |
+| `PUT` | `/students/overview/{studentNo}` | `student` | `UPDATE` |
+| `DELETE` | `/students/overview/{studentNo}` | `student` | `DELETE` |
+
+学业表现：
+
+| 方法 | 路径 | 模块 | 操作类型 |
+| --- | --- | --- | --- |
+| `PUT` | `/students/performance/{studentNo}` | `performance` | `UPSERT` |
+
+认证：
+
+| 方法 | 路径 | 模块 | 操作类型 |
+| --- | --- | --- | --- |
+| `POST` | `/logout` | `auth` | `LOGOUT` |
+
+登录日志暂未自动记录。原因是 `/login` 发生在 JWT 鉴权之前，AOP 无法从 `SysUserContext` 读取当前用户。后续如果需要登录成功 / 失败日志，应在 `SysUserServiceImpl.login()` 内手动写入。
+
+### 验证记录
+
+本次后端实现已通过：
+
+```bash
+mvn -q test
+xmllint --noout src/main/resources/mapper/OperationLogMapper.xml src/main/resources/mapper/StudentMapper.xml src/main/resources/mapper/AnalysisMapper.xml
+git diff --cached --check
+```
 
 ## 昨晚新增后端能力整理
 

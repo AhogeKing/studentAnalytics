@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ahogeking.studentanalytics.mapper.WarningMapper">
+    <resultMap id="WarningGenerationContextRowResultMap"
+               type="com.ahogeking.studentanalytics.dto.row.WarningGenerationContextRow">
+        <result column="prediction_result_id" property="predictionResultId"/>
+        <result column="student_id" property="studentId"/>
+        <result column="student_no" property="studentNo"/>
+        <result column="student_name" property="studentName"/>
+        <result column="grade_level" property="gradeLevel"/>
+        <result column="class_name" property="className"/>
+        <result column="performance_id" property="performanceId"/>
+        <result column="model_version_id" property="modelVersionId"/>
+        <result column="model_version_no" property="modelVersionNo"/>
+        <result column="predicted_grade_class" property="predictedGradeClass"/>
+        <result column="predicted_grade_label" property="predictedGradeLabel"/>
+        <result column="gpa" property="gpa"/>
+        <result column="absences" property="absences"/>
+        <result column="study_time_weekly" property="studyTimeWeekly"/>
+        <result column="parental_support" property="parentalSupport"/>
+        <result column="tutoring" property="tutoring"/>
+    </resultMap>
+
+    <resultMap id="WarningRecordRowResultMap" type="com.ahogeking.studentanalytics.dto.row.WarningRecordRow">
+        <id column="warning_id" property="id"/>
+        <result column="student_id" property="studentId"/>
+        <result column="student_no" property="studentNo"/>
+        <result column="student_name" property="studentName"/>
+        <result column="grade_level" property="gradeLevel"/>
+        <result column="class_name" property="className"/>
+        <result column="prediction_result_id" property="predictionResultId"/>
+        <result column="model_version_id" property="modelVersionId"/>
+        <result column="model_version_no" property="modelVersionNo"/>
+        <result column="predicted_grade_class" property="predictedGradeClass"/>
+        <result column="predicted_grade_label" property="predictedGradeLabel"/>
+        <result column="risk_score" property="riskScore"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="risk_reasons_json" property="riskReasonsJson"/>
+        <result column="suggestion_json" property="suggestionJson"/>
+        <result column="status" property="status"/>
+        <result column="handler_user_id" property="handlerUserId"/>
+        <result column="handler_username" property="handlerUsername"/>
+        <result column="handler_real_name" property="handlerRealName"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="selectWarningGenerationContext" resultMap="WarningGenerationContextRowResultMap">
+        SELECT
+            pr.id AS prediction_result_id,
+            pr.student_id,
+            s.student_no,
+            s.name AS student_name,
+            s.grade_level,
+            s.class_name,
+            pr.performance_id,
+            pr.model_version_id,
+            mv.version_no AS model_version_no,
+            pr.predicted_grade_class,
+            pr.predicted_grade_label,
+            p.gpa,
+            p.absences,
+            p.study_time_weekly,
+            p.parental_support,
+            p.tutoring
+        FROM prediction_result pr
+        INNER JOIN student s
+                ON s.id = pr.student_id
+        INNER JOIN student_performance p
+                ON p.id = pr.performance_id
+        INNER JOIN model_version mv
+                ON mv.id = pr.model_version_id
+        WHERE pr.id = #{predictionResultId}
+          AND s.deleted = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insertWarningRecord"
+            parameterType="com.ahogeking.studentanalytics.entity.WarningRecord"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO warning_record (
+            student_id,
+            prediction_result_id,
+            risk_score,
+            risk_level,
+            risk_reasons_json,
+            suggestion_json,
+            status,
+            handler_user_id
+        )
+        VALUES (
+            #{studentId},
+            #{predictionResultId},
+            #{riskScore},
+            #{riskLevel},
+            #{riskReasonsJson},
+            #{suggestionJson},
+            #{status},
+            #{handlerUserId}
+        )
+    </insert>
+
+    <sql id="WarningRecordSelectColumns">
+        wr.id AS warning_id,
+        wr.student_id,
+        s.student_no,
+        s.name AS student_name,
+        s.grade_level,
+        s.class_name,
+        wr.prediction_result_id,
+        pr.model_version_id,
+        mv.version_no AS model_version_no,
+        pr.predicted_grade_class,
+        pr.predicted_grade_label,
+        wr.risk_score,
+        wr.risk_level,
+        wr.risk_reasons_json,
+        wr.suggestion_json,
+        wr.status,
+        wr.handler_user_id,
+        u.username AS handler_username,
+        u.real_name AS handler_real_name,
+        wr.created_at,
+        wr.updated_at
+    </sql>
+
+    <sql id="WarningRecordFromJoins">
+        FROM warning_record wr
+        INNER JOIN student s
+                ON s.id = wr.student_id
+        LEFT JOIN prediction_result pr
+               ON pr.id = wr.prediction_result_id
+        LEFT JOIN model_version mv
+               ON mv.id = pr.model_version_id
+        LEFT JOIN sys_user u
+               ON u.id = wr.handler_user_id
+    </sql>
+
+    <select id="selectWarningRecordById" resultMap="WarningRecordRowResultMap">
+        SELECT
+            <include refid="WarningRecordSelectColumns"/>
+        <include refid="WarningRecordFromJoins"/>
+        WHERE wr.id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectWarningByPredictionResultId" resultMap="WarningRecordRowResultMap">
+        SELECT
+            <include refid="WarningRecordSelectColumns"/>
+        <include refid="WarningRecordFromJoins"/>
+        WHERE wr.prediction_result_id = #{predictionResultId}
+        ORDER BY wr.created_at DESC, wr.id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestWarningByStudentNo" resultMap="WarningRecordRowResultMap">
+        SELECT
+            <include refid="WarningRecordSelectColumns"/>
+        <include refid="WarningRecordFromJoins"/>
+        WHERE s.student_no = #{studentNo}
+          AND s.deleted = 0
+        ORDER BY wr.created_at DESC, wr.id DESC
+        LIMIT 1
+    </select>
+
+    <sql id="WarningRecordWhere">
+        <where>
+            AND s.deleted = 0
+            <if test="query.studentNo != null">
+                AND s.student_no = #{query.studentNo}
+            </if>
+            <if test="query.studentName != null and query.studentName != ''">
+                AND s.name LIKE CONCAT('%', #{query.studentName}, '%')
+            </if>
+            <if test="query.gradeLevel != null">
+                AND s.grade_level = #{query.gradeLevel}
+            </if>
+            <if test="query.className != null and query.className != ''">
+                AND s.class_name = #{query.className}
+            </if>
+            <if test="query.riskLevel != null and query.riskLevel != ''">
+                AND wr.risk_level = #{query.riskLevel}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND wr.status = #{query.status}
+            </if>
+            <if test="query.startTime != null">
+                AND wr.created_at &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND wr.created_at &lt;= #{query.endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="countWarningRecords" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM warning_record wr
+        INNER JOIN student s
+                ON s.id = wr.student_id
+        <include refid="WarningRecordWhere"/>
+    </select>
+
+    <select id="selectWarningRecordPage" resultMap="WarningRecordRowResultMap">
+        SELECT
+            <include refid="WarningRecordSelectColumns"/>
+        <include refid="WarningRecordFromJoins"/>
+        <include refid="WarningRecordWhere"/>
+        ORDER BY wr.created_at DESC, wr.id DESC
+        LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <update id="updateWarningStatus">
+        UPDATE warning_record
+        SET status = #{status},
+            handler_user_id = #{handlerUserId}
+        WHERE id = #{id}
+    </update>
+</mapper>

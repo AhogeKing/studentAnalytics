@@ -8,17 +8,23 @@ student-analytics.iml
 reports
 scripts
 .claude
+.DS_Store
 
 # dataset
 dataset/Student_performance_data_.csv
+
+# ml runtime artifacts
+runtime/ml/
+python/ml/artifacts/
 
 # docs
 doc/*
 #!doc/
 !doc/TODO.md
 !doc/utility-classes-usage.md
-.DS_Store
-target/
+!doc/backend-log.md
+!doc/frontend-design-log.md
+!doc/python-log.md
 
 # sql
 src/main/resources/sql/studentAnalytics_schema.sql
@@ -36,3 +42,7 @@ scripts/import_student_data_ori.py
 
 # .vscode
 .vscode
+
+# release
+release
+target

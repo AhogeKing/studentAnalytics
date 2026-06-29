@@ -116,6 +116,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--sample", action="store_true", help="Use a built-in sample student.")
     parser.add_argument("--input", type=Path, help="Path to a JSON file containing one student.")
     parser.add_argument("--json", help="Inline JSON object containing one student.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Path to write the prediction result JSON. Defaults to stdout.",
+    )
     return parser.parse_args(argv)
 
 
@@ -123,7 +128,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     features = parse_feature_input(args)
     result = predict_one(features, model_path=args.model_path)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    output_text = json.dumps(result, ensure_ascii=False, indent=2)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(output_text + "\n", encoding="utf-8")
+    else:
+        print(output_text)
     return 0
 
 

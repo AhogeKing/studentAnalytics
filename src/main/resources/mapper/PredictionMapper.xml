@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ahogeking.studentanalytics.mapper.PredictionMapper">
+    <resultMap id="PredictionInputRowResultMap" type="com.ahogeking.studentanalytics.dto.row.PredictionInputRow">
+        <result column="student_id" property="studentId"/>
+        <result column="student_no" property="studentNo"/>
+        <result column="name" property="name"/>
+        <result column="grade_level" property="gradeLevel"/>
+        <result column="class_name" property="className"/>
+        <result column="performance_id" property="performanceId"/>
+        <result column="age" property="age"/>
+        <result column="gender" property="gender"/>
+        <result column="ethnicity" property="ethnicity"/>
+        <result column="parental_education" property="parentalEducation"/>
+        <result column="study_time_weekly" property="studyTimeWeekly"/>
+        <result column="absences" property="absences"/>
+        <result column="tutoring" property="tutoring"/>
+        <result column="parental_support" property="parentalSupport"/>
+        <result column="extracurricular" property="extracurricular"/>
+        <result column="sports" property="sports"/>
+        <result column="music" property="music"/>
+        <result column="volunteering" property="volunteering"/>
+        <result column="gpa" property="gpa"/>
+        <result column="grade_class" property="gradeClass"/>
+    </resultMap>
+
+    <resultMap id="PredictionResultRowResultMap" type="com.ahogeking.studentanalytics.dto.row.PredictionResultRow">
+        <id column="prediction_result_id" property="id"/>
+        <result column="student_id" property="studentId"/>
+        <result column="student_no" property="studentNo"/>
+        <result column="student_name" property="studentName"/>
+        <result column="grade_level" property="gradeLevel"/>
+        <result column="class_name" property="className"/>
+        <result column="performance_id" property="performanceId"/>
+        <result column="model_version_id" property="modelVersionId"/>
+        <result column="model_version_no" property="modelVersionNo"/>
+        <result column="predicted_grade_class" property="predictedGradeClass"/>
+        <result column="predicted_grade_label" property="predictedGradeLabel"/>
+        <result column="probability_json" property="probabilityJson"/>
+        <result column="important_factors_json" property="importantFactorsJson"/>
+        <result column="predict_input_json" property="predictInputJson"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="selectPredictionInputByStudentNo" resultMap="PredictionInputRowResultMap">
+        SELECT
+            s.id AS student_id,
+            s.student_no,
+            s.name,
+            s.grade_level,
+            s.class_name,
+            s.age,
+            s.gender,
+            s.ethnicity,
+            s.parental_education,
+            p.id AS performance_id,
+            p.study_time_weekly,
+            p.absences,
+            p.tutoring,
+            p.parental_support,
+            p.extracurricular,
+            p.sports,
+            p.music,
+            p.volunteering,
+            p.gpa,
+            p.grade_class
+        FROM student s
+        LEFT JOIN student_performance p
+               ON p.student_id = s.id
+        WHERE s.student_no = #{studentNo}
+          AND s.deleted = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insertPredictionResult"
+            parameterType="com.ahogeking.studentanalytics.entity.PredictionResult"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO prediction_result (
+            student_id,
+            performance_id,
+            model_version_id,
+            predicted_grade_class,
+            predicted_grade_label,
+            probability_json,
+            important_factors_json,
+            predict_input_json
+        )
+        VALUES (
+            #{studentId},
+            #{performanceId},
+            #{modelVersionId},
+            #{predictedGradeClass},
+            #{predictedGradeLabel},
+            #{probabilityJson},
+            #{importantFactorsJson},
+            #{predictInputJson}
+        )
+    </insert>
+
+    <sql id="PredictionResultSelectColumns">
+        pr.id AS prediction_result_id,
+        pr.student_id,
+        s.student_no,
+        s.name AS student_name,
+        s.grade_level,
+        s.class_name,
+        pr.performance_id,
+        pr.model_version_id,
+        mv.version_no AS model_version_no,
+        pr.predicted_grade_class,
+        pr.predicted_grade_label,
+        pr.probability_json,
+        pr.important_factors_json,
+        pr.predict_input_json,
+        pr.created_at
+    </sql>
+
+    <select id="selectPredictionResultById" resultMap="PredictionResultRowResultMap">
+        SELECT
+            <include refid="PredictionResultSelectColumns"/>
+        FROM prediction_result pr
+        INNER JOIN student s
+                ON s.id = pr.student_id
+        INNER JOIN model_version mv
+                ON mv.id = pr.model_version_id
+        WHERE pr.id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestPredictionByStudentNo" resultMap="PredictionResultRowResultMap">
+        SELECT
+            <include refid="PredictionResultSelectColumns"/>
+        FROM prediction_result pr
+        INNER JOIN student s
+                ON s.id = pr.student_id
+        INNER JOIN model_version mv
+                ON mv.id = pr.model_version_id
+        WHERE s.student_no = #{studentNo}
+          AND s.deleted = 0
+        ORDER BY pr.created_at DESC, pr.id DESC
+        LIMIT 1
+    </select>
+</mapper>

@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ahogeking.studentanalytics.mapper.ModelMapper">
+    <resultMap id="ModelTrainingRowResultMap" type="com.ahogeking.studentanalytics.dto.row.ModelTrainingRow">
+        <result column="StudentID" property="studentId"/>
+        <result column="Age" property="age"/>
+        <result column="Gender" property="gender"/>
+        <result column="Ethnicity" property="ethnicity"/>
+        <result column="ParentalEducation" property="parentalEducation"/>
+        <result column="StudyTimeWeekly" property="studyTimeWeekly"/>
+        <result column="Absences" property="absences"/>
+        <result column="Tutoring" property="tutoring"/>
+        <result column="ParentalSupport" property="parentalSupport"/>
+        <result column="Extracurricular" property="extracurricular"/>
+        <result column="Sports" property="sports"/>
+        <result column="Music" property="music"/>
+        <result column="Volunteering" property="volunteering"/>
+        <result column="GPA" property="gpa"/>
+        <result column="GradeClass" property="gradeClass"/>
+    </resultMap>
+
+    <resultMap id="ModelVersionResultMap" type="com.ahogeking.studentanalytics.entity.ModelVersion">
+        <id column="id" property="id"/>
+        <result column="model_name" property="modelName"/>
+        <result column="version_no" property="versionNo"/>
+        <result column="algorithm" property="algorithm"/>
+        <result column="feature_columns" property="featureColumns"/>
+        <result column="target_column" property="targetColumn"/>
+        <result column="criterion" property="criterion"/>
+        <result column="max_depth" property="maxDepth"/>
+        <result column="min_samples_leaf" property="minSamplesLeaf"/>
+        <result column="accuracy" property="accuracy"/>
+        <result column="precision_macro" property="precisionMacro"/>
+        <result column="recall_macro" property="recallMacro"/>
+        <result column="f1_macro" property="f1Macro"/>
+        <result column="confusion_matrix_json" property="confusionMatrixJson"/>
+        <result column="model_path" property="modelPath"/>
+        <result column="encoder_path" property="encoderPath"/>
+        <result column="is_active" property="isActive"/>
+        <result column="trained_at" property="trainedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="ModelVersionColumns">
+        id,
+        model_name,
+        version_no,
+        algorithm,
+        feature_columns,
+        target_column,
+        criterion,
+        max_depth,
+        min_samples_leaf,
+        accuracy,
+        precision_macro,
+        recall_macro,
+        f1_macro,
+        confusion_matrix_json,
+        model_path,
+        encoder_path,
+        is_active,
+        trained_at,
+        created_by,
+        created_at
+    </sql>
+
+    <select id="selectModelTrainingRows" resultMap="ModelTrainingRowResultMap">
+        SELECT
+            StudentID,
+            Age,
+            Gender,
+            Ethnicity,
+            ParentalEducation,
+            StudyTimeWeekly,
+            Absences,
+            Tutoring,
+            ParentalSupport,
+            Extracurricular,
+            Sports,
+            Music,
+            Volunteering,
+            GPA,
+            GradeClass
+        FROM v_student_model_dataset
+        ORDER BY StudentID
+    </select>
+
+    <update id="deactivateAllModels">
+        UPDATE model_version
+        SET is_active = 0
+        WHERE is_active = 1
+    </update>
+
+    <insert id="insertModelVersion"
+            parameterType="com.ahogeking.studentanalytics.entity.ModelVersion"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO model_version (
+            model_name,
+            version_no,
+            algorithm,
+            feature_columns,
+            target_column,
+            criterion,
+            max_depth,
+            min_samples_leaf,
+            accuracy,
+            precision_macro,
+            recall_macro,
+            f1_macro,
+            confusion_matrix_json,
+            model_path,
+            encoder_path,
+            is_active,
+            trained_at,
+            created_by
+        )
+        VALUES (
+            #{modelName},
+            #{versionNo},
+            #{algorithm},
+            #{featureColumns},
+            #{targetColumn},
+            #{criterion},
+            #{maxDepth},
+            #{minSamplesLeaf},
+            #{accuracy},
+            #{precisionMacro},
+            #{recallMacro},
+            #{f1Macro},
+            #{confusionMatrixJson},
+            #{modelPath},
+            #{encoderPath},
+            #{isActive},
+            #{trainedAt},
+            #{createdBy}
+        )
+    </insert>
+
+    <select id="selectActiveModelVersion" resultMap="ModelVersionResultMap">
+        SELECT
+            <include refid="ModelVersionColumns"/>
+        FROM model_version
+        WHERE is_active = 1
+        ORDER BY trained_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectModelVersionById" resultMap="ModelVersionResultMap">
+        SELECT
+            <include refid="ModelVersionColumns"/>
+        FROM model_version
+        WHERE id = #{id}
+    </select>
+
+    <sql id="ModelVersionWhere">
+        <where>
+            <if test="query.active != null">
+                AND is_active = #{query.active}
+            </if>
+            <if test="query.startTime != null">
+                AND trained_at &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND trained_at &lt;= #{query.endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="countModelVersions" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM model_version
+        <include refid="ModelVersionWhere"/>
+    </select>
+
+    <select id="selectModelVersionPage" resultMap="ModelVersionResultMap">
+        SELECT
+            <include refid="ModelVersionColumns"/>
+        FROM model_version
+        <include refid="ModelVersionWhere"/>
+        ORDER BY trained_at DESC, id DESC
+        LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+</mapper>
